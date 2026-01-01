@@ -137,18 +137,51 @@ const LoginScreen = ({ navigation }) => {
 
           {/* Demo Credentials */}
           <View style={styles.demoContainer}>
-            <Text style={styles.demoTitle}>Demo Credentials (Testing Only):</Text>
+            <Text style={styles.demoTitle}>🔓 Demo Credentials (password123)</Text>
 
+            {/* Owner */}
             <View style={styles.demoRoleContainer}>
-              <Text style={styles.demoRoleTitle}>👑 Owner:</Text>
-              <Text style={styles.demoText}>Email: owner@houseway.com</Text>
-              <Text style={styles.demoText}>Password: password123</Text>
+              <Text style={styles.demoRoleTitle}>👑 Owner</Text>
+              <Text style={styles.demoText}>owner@houseway.com</Text>
             </View>
 
+            {/* Employees */}
             <View style={styles.demoRoleContainer}>
-              <Text style={styles.demoRoleTitle}>👷 Employee (Design Team):</Text>
-              <Text style={styles.demoText}>Email: employee.designteam.1@houseway.com</Text>
-              <Text style={styles.demoText}>Password: password123</Text>
+              <Text style={styles.demoRoleTitle}>👷 Employees (15)</Text>
+              <View style={styles.demoSubGroup}>
+                <Text style={styles.demoSubTitle}>Design Team:</Text>
+                <Text style={styles.demoText}>employee.designteam.1-5@houseway.com</Text>
+              </View>
+              <View style={styles.demoSubGroup}>
+                <Text style={styles.demoSubTitle}>Vendor Team:</Text>
+                <Text style={styles.demoText}>employee.vendorteam.1-5@houseway.com</Text>
+              </View>
+              <View style={styles.demoSubGroup}>
+                <Text style={styles.demoSubTitle}>Execution Team:</Text>
+                <Text style={styles.demoText}>employee.executionteam.1-5@houseway.com</Text>
+              </View>
+            </View>
+
+            {/* Vendors */}
+            <View style={styles.demoRoleContainer}>
+              <Text style={styles.demoRoleTitle}>🔧 Vendors (20)</Text>
+              <Text style={styles.demoText}>vendor1-20@company.com</Text>
+            </View>
+
+            {/* Clients */}
+            <View style={styles.demoRoleContainer}>
+              <Text style={styles.demoRoleTitle}>🏠 Clients (30)</Text>
+              <Text style={styles.demoText}>client1-30@example.com</Text>
+            </View>
+
+            {/* Guests */}
+            <View style={styles.demoRoleContainer}>
+              <Text style={styles.demoRoleTitle}>👥 Guests (5)</Text>
+              <Text style={styles.demoText}>guest1-5@example.com</Text>
+            </View>
+
+            <View style={styles.demoNote}>
+              <Text style={styles.demoNoteText}>⚠️ Testing only. Never use in production.</Text>
             </View>
           </View>
         </View>
@@ -277,11 +310,37 @@ const styles = StyleSheet.create({
     color: '#1976d2',
     marginBottom: 4,
   },
+  demoSubGroup: {
+    marginLeft: 12,
+    marginTop: 6,
+    paddingLeft: 8,
+    borderLeftWidth: 2,
+    borderLeftColor: '#90caf9',
+  },
+  demoSubTitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#1565c0',
+    marginBottom: 2,
+  },
   demoText: {
     fontSize: 13,
     color: '#1976d2',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     marginBottom: 2,
+  },
+  demoNote: {
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: '#fff3cd',
+    borderRadius: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff9800',
+  },
+  demoNoteText: {
+    fontSize: 12,
+    color: '#e65100',
+    fontWeight: '500',
   },
 });
 

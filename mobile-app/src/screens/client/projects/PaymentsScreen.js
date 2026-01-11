@@ -13,14 +13,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { projectsAPI } from "../../../utils/api";
 
-// Premium White Theme with Gold Accents
+// Premium White Theme with Yellow Fade Accents
 const COLORS = {
-  primary: '#D4AF37',        // Dark Golden Rod
-  primaryDark: '#8B6914',    // Darker Gold
-  primaryLight: 'rgba(184, 134, 11, 0.15)',
+  primary: '#F4D03F',        // Yellow Fade
+  primaryDark: '#D4AC0D',    // Darker Yellow
+  primaryLight: 'rgba(244, 208, 63, 0.15)',
   background: '#FFFFFF',     // Clean White
   cardBg: '#FFFFFF',         // White
-  cardBorder: 'rgba(184, 134, 11, 0.1)',
+  cardBorder: 'rgba(244, 208, 63, 0.1)',
   text: '#1A1A1A',           // Dark text
   textMuted: '#666666',      // Muted text
   success: '#22C55E',

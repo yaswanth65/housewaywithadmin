@@ -18,11 +18,14 @@ import ReceivablesScreen from '../screens/owner/ReceivablesScreen';
 import PayablesScreen from '../screens/owner/PayablesScreen';
 import InvoicesScreen from '../screens/owner/InvoicesScreen';
 import PurchaseOrdersScreen from '../screens/owner/PurchaseOrdersScreen';
+import CreateInvoiceScreen from '../screens/clientManagement/CreateInvoiceScreen';
 
 // Project Screens
 import ProjectsHubScreen from '../screens/owner/ProjectsHubScreen';
 import ActiveProjectsListScreen from '../screens/owner/ActiveProjectsListScreen';
 import ProjectDetailsScreen from '../screens/owner/ProjectDetailsScreen';
+import CreateProjectScreen from '../screens/client/projects/CreateProjectScreen';
+import ProjectPaymentsScreen from '../screens/client/projects/PaymentsScreen';
 
 // Shared Screens
 import NegotiationChatScreen from '../screens/shared/NegotiationChatScreen';
@@ -57,6 +60,8 @@ const FinanceStack = () => (
     <Stack.Screen name="Payables" component={PayablesScreen} />
     <Stack.Screen name="Invoices" component={InvoicesScreen} />
     <Stack.Screen name="PurchaseOrders" component={PurchaseOrdersScreen} />
+    <Stack.Screen name="ProjectPayments" component={ProjectPaymentsScreen} />
+    <Stack.Screen name="CreateInvoice" component={CreateInvoiceScreen} />
   </Stack.Navigator>
 );
 
@@ -65,6 +70,7 @@ const ProjectsStack = () => (
     <Stack.Screen name="ProjectsHub" component={ProjectsHubScreen} />
     <Stack.Screen name="ProjectList" component={ActiveProjectsListScreen} />
     <Stack.Screen name="ProjectDetails" component={ProjectDetailsScreen} />
+    <Stack.Screen name="CreateProject" component={CreateProjectScreen} />
   </Stack.Navigator>
 );
 

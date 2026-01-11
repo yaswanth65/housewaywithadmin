@@ -47,8 +47,19 @@ const apiRequest = async (endpoint, options = {}) => {
         ...options.headers,
       },
     });
-    
-    const data = await response.json();
+
+    // Some backend errors return HTML (e.g., 404). Avoid crashing on JSON.parse.
+    const raw = await response.text();
+    let data;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch (parseError) {
+      data = {
+        success: false,
+        message: `Non-JSON response (HTTP ${response.status})`,
+        raw: raw?.slice(0, 200),
+      };
+    }
     
     if (!response.ok) {
       console.error('[API] Error response:', data);
@@ -85,7 +96,22 @@ class ApiService {
   }
   
   async createUser(userData) {
-    const response = await apiRequest('/users', {
+    const role = userData?.role;
+
+    // Backend does not expose POST /api/users. Owner workflows use auth registration endpoints.
+    // - employee/vendor: owner-only endpoints (require auth)
+    // - client/guest: public endpoints
+    // - owner: not supported via UI
+    let endpoint = '/auth/register';
+    if (role === 'employee') endpoint = '/auth/register-employee';
+    else if (role === 'vendor') endpoint = '/auth/register-vendor';
+    else if (role === 'client') endpoint = '/auth/register-client';
+    else if (role === 'guest') endpoint = '/auth/register-guest';
+    else if (role === 'owner') {
+      throw new Error('Creating owner accounts is not supported from this screen');
+    }
+
+    const response = await apiRequest(endpoint, {
       method: 'POST',
       body: JSON.stringify(userData),
     });
@@ -141,6 +167,29 @@ class ApiService {
       body: JSON.stringify(projectData),
     });
     return response.data?.project || response;
+  }
+
+  async getProjectTimeline(projectId, filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.page) params.append('page', String(filters.page));
+    if (filters.limit) params.append('limit', String(filters.limit));
+    if (filters.eventType) params.append('eventType', filters.eventType);
+    if (filters.visibility) params.append('visibility', filters.visibility);
+
+    const qs = params.toString();
+    const endpoint = `/projects/${projectId}/timeline${qs ? `?${qs}` : ''}`;
+    const response = await apiRequest(endpoint);
+    return response.data?.events || response.events || [];
+  }
+
+  async getRecentProjectTimelineUpdates(limit = 10, filters = {}) {
+    const params = new URLSearchParams();
+    params.append('limit', String(limit));
+    if (filters.visibility) params.append('visibility', filters.visibility);
+
+    const endpoint = `/projects/timeline/recent?${params.toString()}`;
+    const response = await apiRequest(endpoint);
+    return response.data?.events || response.events || [];
   }
   
   // ============ FINANCE - INVOICES ============
@@ -249,17 +298,34 @@ class ApiService {
       console.log('[API] Processing', invoices.length, 'receivable invoices');
       
       // Transform to receivables format (mapping clientId/projectId to client/project)
-      const transformed = invoices.filter(inv => inv.status !== 'paid').map(inv => ({
-        _id: inv._id,
-        invoiceNumber: inv.invoiceNumber,
-        projectId: inv.projectId?._id || inv.projectId,
-        projectName: inv.projectId?.title || 'Unknown Project',
-        clientName: inv.clientId?.firstName ? `${inv.clientId.firstName} ${inv.clientId.lastName}` : 'Unknown Client',
-        amount: inv.totalAmount || inv.amount || 0,
-        dueDate: inv.dueDate,
-        status: inv.status || 'pending',
-        type: 'receivable',
-      }));
+      const transformed = invoices.filter(inv => inv.status !== 'paid').map(inv => {
+        const now = new Date();
+        let computedStatus = inv.status || 'pending';
+        try {
+          if (inv.dueDate) {
+            const due = new Date(inv.dueDate);
+            if (computedStatus !== 'paid' && !['cancelled','refunded'].includes(computedStatus) && due < now) {
+              computedStatus = 'overdue';
+            }
+          }
+        } catch (e) {
+          // Ignore parse errors and keep original status
+        }
+
+        return {
+          _id: inv._id,
+          invoiceNumber: inv.invoiceNumber,
+          projectId: inv.projectId?._id || inv.projectId,
+          projectName: inv.projectId?.title || 'Unknown Project',
+          clientName: inv.clientId?.firstName ? `${inv.clientId.firstName} ${inv.clientId.lastName}` : 'Unknown Client',
+          amount: inv.totalAmount || inv.amount || 0,
+          dueDate: inv.dueDate,
+          status: computedStatus,
+          type: 'receivable',
+          isSchedule: inv.isSchedule || false,
+          installmentName: inv.installmentName || null
+        };
+      });
       
       console.log('[API] Transformed to', transformed.length, 'receivables');
       return transformed;
@@ -308,6 +374,7 @@ class ApiService {
     const params = new URLSearchParams();
     if (filters.status) params.append('status', filters.status);
     if (filters.project) params.append('project', filters.project);
+    if (filters.limit) params.append('limit', String(filters.limit));
     
     const queryString = params.toString();
     const endpoint = `/material-requests${queryString ? `?${queryString}` : ''}`;
@@ -502,8 +569,8 @@ class ApiService {
         activeEmployees: data.summary?.users?.employees || 0,
         totalVendors: data.summary?.users?.vendors || 0,
         totalClients: data.summary?.users?.clients || 0,
-        pendingVendorApprovals: data.alerts?.unreadQuotations || 0,
-        utilizationRate: 75, // Default value
+        pendingVendorApprovals: data.alerts?.unreadMessages || 0,
+        utilizationRate: 0,
       };
     } catch (error) {
       console.error('getTeamStats error:', error);
@@ -542,21 +609,27 @@ class ApiService {
   
   // ============ TASKS ============
   
-  async getTasks(filters = {}) {
-    const params = new URLSearchParams();
-    if (filters.project) params.append('project', filters.project);
-    if (filters.status) params.append('status', filters.status);
-    if (filters.assignee) params.append('assignee', filters.assignee);
-    
-    const queryString = params.toString();
-    const endpoint = `/tasks${queryString ? `?${queryString}` : ''}`;
+  async getTasks() {
+    // Backend does not currently expose GET /api/tasks for all tasks.
+    // Use getUpcomingTasks() or getProjectTasks(projectId).
+    return [];
+  }
+
+  async getUpcomingTasks(days = 7) {
+    const endpoint = `/tasks/upcoming?days=${encodeURIComponent(String(days))}`;
     const response = await apiRequest(endpoint);
-    
     return response.data?.tasks || response.tasks || [];
   }
-  
-  async getProjectTasks(projectId) {
-    return this.getTasks({ project: projectId });
+
+  async getProjectTasks(projectId, filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.fromDate) params.append('fromDate', filters.fromDate);
+
+    const qs = params.toString();
+    const endpoint = `/tasks/project/${projectId}${qs ? `?${qs}` : ''}`;
+    const response = await apiRequest(endpoint);
+    return response.data?.tasks || response.tasks || [];
   }
   
   async createTask(taskData) {
@@ -573,6 +646,20 @@ class ApiService {
       body: JSON.stringify(updates),
     });
     return response.data?.task || response;
+  }
+
+  // ============ INVOICES (Project) ============
+
+  async getProjectInvoices(projectId, filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.page) params.append('page', String(filters.page));
+    if (filters.limit) params.append('limit', String(filters.limit));
+
+    const qs = params.toString();
+    const endpoint = `/invoices/project/${projectId}${qs ? `?${qs}` : ''}`;
+    const response = await apiRequest(endpoint);
+    return response.data?.invoices || response.invoices || [];
   }
   
   // ============ VENDOR CHATS (Legacy support - use ordersAPI for new code) ============

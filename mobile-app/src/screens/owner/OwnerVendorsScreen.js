@@ -17,6 +17,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { usersAPI, purchaseOrdersAPI, vendorInvoicesAPI } from '../../utils/api';
 import AdminNavbar from '../../components/AdminNavbar';
 
+const getId = (value) => (typeof value === 'string' ? value : value?._id);
+const getInvoiceAmount = (invoice) => Number(invoice?.totalAmount ?? invoice?.amount ?? 0);
+const getOrderFinalAmount = (order) => Number(order?.negotiation?.finalAmount ?? order?.finalAmount ?? order?.totalAmount ?? 0);
+
 // Vendor List Item
 const VendorListItem = ({ vendor, onPress, pendingCount, ordersCount }) => (
   <TouchableOpacity style={styles.listItem} onPress={onPress}>
@@ -58,7 +62,8 @@ const VendorProjectsModal = ({ visible, vendor, onClose, onSelectInvoice, onSele
       setLoading(true);
       // Get vendor invoices
       const invoicesRes = await vendorInvoicesAPI.getVendorInvoices();
-      const vendorInvoices = (invoicesRes.data?.invoices || invoicesRes || []).filter((inv) => inv.vendor?._id === vendor._id || inv.vendor === vendor._id);
+      const invoiceList = invoicesRes?.data?.invoices || [];
+      const vendorInvoices = invoiceList.filter((inv) => getId(inv.vendor) === vendor._id);
       setInvoices(vendorInvoices);
 
       // Get vendor orders
@@ -191,9 +196,9 @@ const VendorProjectsModal = ({ visible, vendor, onClose, onSelectInvoice, onSele
 
                       <View style={styles.orderFooter}>
                         <Text style={styles.orderProject}>{order.project?.title || 'Project'}</Text>
-                        {order.finalAmount && (
+                        {getOrderFinalAmount(order) > 0 && (
                           <Text style={styles.orderAmount}>
-                            ₹{order.finalAmount.toLocaleString()}
+                            ₹{getOrderFinalAmount(order).toLocaleString()}
                           </Text>
                         )}
                       </View>
@@ -253,7 +258,7 @@ const VendorProjectsModal = ({ visible, vendor, onClose, onSelectInvoice, onSele
                         </Text>
                       </View>
                       <Text style={styles.invoiceAmount}>
-                        ₹{Number(invoice.amount || 0).toLocaleString()}
+                        ₹{getInvoiceAmount(invoice).toLocaleString()}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -294,7 +299,7 @@ const OwnerVendorsScreen = ({ navigation }) => {
       setVendors(vendorsData);
       
       // Handle invoices response
-      const invoicesData = invoicesRes.data?.invoices || invoicesRes || [];
+      const invoicesData = invoicesRes?.data?.invoices || [];
       setInvoices(invoicesData);
       
       // Handle orders response
@@ -357,7 +362,9 @@ const OwnerVendorsScreen = ({ navigation }) => {
 
   const getVendorPendingCount = (vendorId) => {
     // Count pending invoices + orders in_negotiation (have pending quotations)
-    const pendingInvoiceCount = invoices.filter((inv) => inv.vendor === vendorId && inv.status === 'pending').length;
+    const pendingInvoiceCount = (Array.isArray(invoices) ? invoices : []).filter(
+      (inv) => getId(inv.vendor) === vendorId && inv.status === 'pending'
+    ).length;
     const pendingQuotationsCount = orders.filter((ord) => {
       const orderVendorId = typeof ord.vendor === 'string' ? ord.vendor : ord.vendor?._id;
       return orderVendorId === vendorId && ord.status === 'in_negotiation';
@@ -379,7 +386,9 @@ const OwnerVendorsScreen = ({ navigation }) => {
     return orders.filter(ord => ord.status === 'in_negotiation').length;
   };
 
-  const acceptedInvoices = invoices.filter((inv) => inv.status === 'approved' || inv.status === 'paid');
+  const acceptedInvoices = (Array.isArray(invoices) ? invoices : []).filter(
+    (inv) => inv.status === 'approved' || inv.status === 'paid'
+  );
 
   if (loading) {
     return (
@@ -495,7 +504,8 @@ const OwnerVendorsScreen = ({ navigation }) => {
           <View style={styles.card}>
             <Text style={styles.cardTitle}>ACCEPTED INVOICES OVERVIEW</Text>
             {acceptedInvoices.map((invoice) => {
-              const vendor = vendors.find((v) => v._id === invoice.vendor);
+              const invoiceVendorId = getId(invoice.vendor);
+              const vendor = vendors.find((v) => v._id === invoiceVendorId);
               const vendorName =
                 vendor?.vendorDetails?.companyName || `${vendor?.firstName || ''} ${vendor?.lastName || ''}` ||
                 'Unknown Vendor';
@@ -511,7 +521,7 @@ const OwnerVendorsScreen = ({ navigation }) => {
                       <Text style={styles.badgeText}>✓ Accepted</Text>
                     </View>
                     <Text style={styles.invoiceAmount}>
-                      ₹{Number(invoice.amount || 0).toLocaleString()}
+                      ₹{getInvoiceAmount(invoice).toLocaleString()}
                     </Text>
                   </View>
                 </View>

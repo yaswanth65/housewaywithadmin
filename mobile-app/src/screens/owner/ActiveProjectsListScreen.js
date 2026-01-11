@@ -23,6 +23,13 @@ const ActiveProjectsListScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState([]);
 
+  const getClientDisplayName = (client) => {
+    if (!client) return '';
+    if (typeof client === 'string') return client;
+    const fullName = `${client.firstName || ''} ${client.lastName || ''}`.trim();
+    return fullName || client.email || '';
+  };
+
   const fetchProjects = async () => {
     try {
       const data = await api.getProjects();
@@ -60,15 +67,17 @@ const ActiveProjectsListScreen = ({ navigation }) => {
   // Filter and search logic
   const filteredProjects = projects.filter(project => {
     // Search filter
-    const matchesSearch = searchQuery === '' || 
-      project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.client?.toLowerCase().includes(searchQuery.toLowerCase());
+    const query = searchQuery.toLowerCase();
+    const clientDisplay = getClientDisplayName(project.client).toLowerCase();
+    const matchesSearch = searchQuery === '' ||
+      (project.title || '').toLowerCase().includes(query) ||
+      clientDisplay.includes(query);
 
     // Active filters
     let matchesFilters = true;
     if (activeFilters.length > 0) {
       if (activeFilters.includes('high-priority')) {
-        matchesFilters = matchesFilters && project.priority === 'high';
+        matchesFilters = matchesFilters && (project.priority === 'high' || project.priority === 'urgent');
       }
       if (activeFilters.includes('delayed')) {
         matchesFilters = matchesFilters && project.status === 'planning';
@@ -82,7 +91,7 @@ const ActiveProjectsListScreen = ({ navigation }) => {
   });
 
   const getStatusConfig = (status, priority) => {
-    if (priority === 'high' || status === 'planning') {
+    if (priority === 'high' || priority === 'urgent' || status === 'planning') {
       return { emoji: '🔴', text: 'Delayed', color: '#D32F2F' };
     }
     if (status === 'on-hold') {
@@ -92,15 +101,20 @@ const ActiveProjectsListScreen = ({ navigation }) => {
   };
 
   const calculateProgress = (project) => {
-    // Simple progress calculation based on status
-    if (project.status === 'completed') return 100;
-    if (project.status === 'in-progress') return Math.floor(Math.random() * 40) + 40; // 40-80%
-    return Math.floor(Math.random() * 30) + 10; // 10-40%
+    const p = project?.progress?.percentage;
+    if (typeof p === 'number' && !Number.isNaN(p)) {
+      return Math.max(0, Math.min(100, Math.round(p)));
+    }
+    if (project?.status === 'completed') return 100;
+    return 0;
   };
 
   const ProjectCard = ({ project }) => {
     const statusConfig = getStatusConfig(project.status, project.priority);
     const progress = calculateProgress(project);
+    const clientName = getClientDisplayName(project.client) || 'N/A';
+    const memberCount = (project.assignedEmployees?.length || 0) + (project.assignedVendors?.length || 0);
+    const startDate = project.timeline?.startDate;
     
     return (
       <TouchableOpacity 
@@ -110,7 +124,7 @@ const ActiveProjectsListScreen = ({ navigation }) => {
       >
         <View style={styles.cardHeader}>
           <Text style={styles.projectTitle} numberOfLines={1}>
-            {project.type === 'residential' ? '🏠' : '🏢'} {project.title}
+            {project.projectType === 'residential' ? '🏠' : '🏢'} {project.title}
           </Text>
           <View style={[styles.statusBadge, { backgroundColor: statusConfig.color + '20' }]}>
             <Text style={[styles.statusText, { color: statusConfig.color }]}>
@@ -119,7 +133,7 @@ const ActiveProjectsListScreen = ({ navigation }) => {
           </View>
         </View>
 
-        <Text style={styles.clientText}>Client: {project.client || 'N/A'}</Text>
+        <Text style={styles.clientText}>Client: {clientName}</Text>
         
         <View style={styles.progressContainer}>
           <Text style={styles.progressLabel}>Progress: {progress}%</Text>
@@ -141,18 +155,18 @@ const ActiveProjectsListScreen = ({ navigation }) => {
           <View style={styles.infoRow}>
             <Ionicons name="people" size={14} color="#666" />
             <Text style={styles.infoText}>
-              {project.team?.length || 0} Members
+              {memberCount} Members
             </Text>
           </View>
           <View style={styles.infoRow}>
             <Ionicons name="calendar" size={14} color="#666" />
             <Text style={styles.infoText}>
-              {project.startDate ? new Date(project.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'}
+              {startDate ? new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'}
             </Text>
           </View>
         </View>
 
-        {project.priority === 'high' && (
+        {(project.priority === 'high' || project.priority === 'urgent') && (
           <View style={styles.urgentBanner}>
             <Ionicons name="alert-circle" size={14} color="#D32F2F" />
             <Text style={styles.urgentText}>High Priority</Text>

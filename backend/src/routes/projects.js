@@ -143,6 +143,38 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 /**
+ * @route   GET /api/projects/timeline/recent
+ * @desc    Get recent project timeline updates across all projects
+ * @access  Private (Owner only)
+ */
+router.get('/timeline/recent', authenticate, authorize('owner'), async (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(50, parseInt(req.query.limit || '10', 10)));
+    const { visibility } = req.query;
+
+    const query = {};
+    if (visibility) query.visibility = visibility;
+
+    const events = await ClientTimelineEvent.find(query)
+      .populate({ path: 'projectId', select: 'title status priority' })
+      .sort({ createdAt: -1 })
+      .limit(limit);
+
+    res.json({
+      success: true,
+      data: { events },
+    });
+  } catch (error) {
+    console.error('Get recent project timeline updates error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get recent project timeline updates',
+      error: error.message,
+    });
+  }
+});
+
+/**
  * @route   GET /api/projects/:id
  * @desc    Get project by ID
  * @access  Private (role-based)

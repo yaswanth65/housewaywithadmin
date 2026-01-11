@@ -12,7 +12,6 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { projectsAPI } from '../../utils/api';
-import { COLORS } from '../../styles/colors';
 import theme from '../../styles/theme';
 
 const VendorTeamDashboardScreen = ({ navigation }) => {
@@ -257,7 +256,7 @@ const styles = StyleSheet.create({
         padding: 16,
         marginHorizontal: 4,
         alignItems: 'center',
-        shadowColor: '#000',
+        shadowColor: theme.colors.neutral[900],
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 4,
@@ -266,12 +265,12 @@ const styles = StyleSheet.create({
     statValue: {
         fontSize: 24,
         fontWeight: '700',
-        color: COLORS.text,
+        color: theme.colors.text.primary,
         marginTop: 8,
     },
     statLabel: {
         fontSize: 11,
-        color: COLORS.textMuted,
+        color: theme.colors.text.muted,
         marginTop: 4,
         textAlign: 'center',
     },
@@ -281,16 +280,16 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: COLORS.text,
+        color: theme.colors.text.primary,
         marginBottom: 16,
     },
     projectCard: {
-        backgroundColor: COLORS.cardBg,
+        backgroundColor: theme.colors.background.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: COLORS.cardBorder,
+        borderColor: theme.colors.primary[100],
     },
     projectHeader: {
         flexDirection: 'row',
@@ -301,7 +300,7 @@ const styles = StyleSheet.create({
     projectTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: COLORS.text,
+        color: theme.colors.text.primary,
         flex: 1,
         marginRight: 8,
     },
@@ -321,7 +320,7 @@ const styles = StyleSheet.create({
     },
     clientName: {
         fontSize: 14,
-        color: COLORS.textMuted,
+        color: theme.colors.text.secondary,
         marginLeft: 6,
     },
     progressContainer: {
@@ -332,19 +331,19 @@ const styles = StyleSheet.create({
     progressBar: {
         flex: 1,
         height: 6,
-        backgroundColor: COLORS.primaryLight,
+        backgroundColor: theme.colors.primary[100],
         borderRadius: 3,
         marginRight: 10,
     },
     progressFill: {
         height: '100%',
-        backgroundColor: COLORS.primary,
+        backgroundColor: theme.colors.primary[600],
         borderRadius: 3,
     },
     progressText: {
         fontSize: 12,
         fontWeight: '600',
-        color: COLORS.primary,
+        color: theme.colors.primary[600],
         width: 35,
     },
     metaRow: {
@@ -358,7 +357,7 @@ const styles = StyleSheet.create({
     },
     metaText: {
         fontSize: 12,
-        color: COLORS.textMuted,
+        color: theme.colors.text.secondary,
         marginLeft: 4,
     },
     emptyState: {
@@ -368,7 +367,7 @@ const styles = StyleSheet.create({
     emptyText: {
         marginTop: 12,
         fontSize: 16,
-        color: COLORS.textMuted,
+        color: theme.colors.text.secondary,
     },
 });
 

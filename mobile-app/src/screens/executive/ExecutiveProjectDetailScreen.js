@@ -1448,10 +1448,10 @@ const MediaTab = ({ project, mediaFiles = [], onUpload, uploading, onDelete }) =
                     {imageOnlyMedia.length > 0 && (
                         <Image
                             source={{ uri: imageOnlyMedia[currentImageIndex]?.url }}
+                            resizeMode="contain"
                             style={{
                                 width: '90%',
                                 height: '70%',
-                                resizeMode: 'contain',
                             }}
                         />
                     )}

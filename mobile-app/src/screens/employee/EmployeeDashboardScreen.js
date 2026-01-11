@@ -133,7 +133,7 @@ const EmployeeDashboardScreen = ({ navigation }) => {
         {isCheckedIn && (
           <View style={styles.sessionCard}>
             <LinearGradient
-              colors={['rgba(255,215,0,0.15)', 'rgba(255,215,0,0.05)']}
+              colors={['rgba(244, 208, 63, 0.08)', 'rgba(244, 208, 63, 0.02)']}
               style={styles.sessionGradient}
             >
               <View style={styles.sessionHeader}>
@@ -206,7 +206,7 @@ const EmployeeDashboardScreen = ({ navigation }) => {
               }
               return;
             }
-            navigation.navigate('Settings');
+            navigation.navigate('SettingsScreen');
           }}
         >
           <Feather name="settings" size={20} color={theme.colors.text.secondary} />

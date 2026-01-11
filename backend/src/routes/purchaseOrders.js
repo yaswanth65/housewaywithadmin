@@ -733,19 +733,38 @@ router.put('/:id/delivery-status', authenticate, authorize('vendor'), async (req
     }
 
     purchaseOrder.deliveryTracking = purchaseOrder.deliveryTracking || {};
+    purchaseOrder.deliveryTracking.updates = purchaseOrder.deliveryTracking.updates || [];
+
+    const now = new Date();
+    const canonicalExpectedArrival = expectedArrival || expectedDeliveryDate || null;
+
     if (status) purchaseOrder.deliveryTracking.status = status;
     if (trackingNumber !== undefined) purchaseOrder.deliveryTracking.trackingNumber = String(trackingNumber || '');
     if (carrier !== undefined) purchaseOrder.deliveryTracking.carrier = String(carrier || '');
-    if (expectedArrival) purchaseOrder.deliveryTracking.expectedArrival = new Date(expectedArrival);
-    if (expectedDeliveryDate) purchaseOrder.deliveryTracking.expectedDeliveryDate = new Date(expectedDeliveryDate);
+    if (canonicalExpectedArrival) {
+      purchaseOrder.deliveryTracking.expectedArrival = new Date(canonicalExpectedArrival);
+      // Back-compat: keep both fields in sync if either is provided.
+      purchaseOrder.deliveryTracking.expectedDeliveryDate = new Date(canonicalExpectedArrival);
+    }
     if (notes !== undefined) purchaseOrder.deliveryTracking.notes = String(notes || '');
-    purchaseOrder.deliveryTracking.updatedAt = new Date();
+    purchaseOrder.deliveryTracking.updatedAt = now;
     purchaseOrder.deliveryTracking.updatedBy = req.user._id;
+
+    // Append an update entry for UI timeline cards
+    purchaseOrder.deliveryTracking.updates.push({
+      status: status || purchaseOrder.deliveryTracking.status || '',
+      notes: notes !== undefined ? String(notes || '') : '',
+      updatedAt: now,
+      updatedBy: req.user._id,
+      trackingNumber: trackingNumber !== undefined ? String(trackingNumber || '') : '',
+      carrier: carrier !== undefined ? String(carrier || '') : '',
+      expectedArrival: canonicalExpectedArrival ? new Date(canonicalExpectedArrival) : null,
+    });
 
     // If delivery status is set to 'delivered', update order status to 'completed'
     if (status === 'delivered') {
       purchaseOrder.status = 'completed';
-      purchaseOrder.deliveryTracking.actualArrival = new Date();
+      purchaseOrder.deliveryTracking.actualArrival = now;
       console.log('[Delivery] Order marked as delivered and completed:', purchaseOrder.purchaseOrderNumber);
     } else if (status === 'partially_delivered' && purchaseOrder.status !== 'partially_delivered') {
       purchaseOrder.status = 'partially_delivered';

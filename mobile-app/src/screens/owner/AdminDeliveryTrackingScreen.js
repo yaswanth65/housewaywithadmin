@@ -23,8 +23,10 @@ import { purchaseOrdersAPI } from '../../utils/api';
 import AdminNavbar from '../../components/AdminNavbar';
 import DeliveryCard, { getStatusConfig } from '../../components/common/DeliveryCard';
 
-const AdminDeliveryTrackingScreen = ({ navigation }) => {
+const AdminDeliveryTrackingScreen = ({ navigation, route }) => {
+  const targetOrderId = route?.params?.orderId;
   const [deliveries, setDeliveries] = useState([]);
+  const [filteredDeliveries, setFilteredDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all'); // all, active, delivered
@@ -46,6 +48,18 @@ const AdminDeliveryTrackingScreen = ({ navigation }) => {
         );
         console.log('Admin deliveries fetched:', acceptedDeliveries.length, 'orders');
         setDeliveries(acceptedDeliveries);
+
+        // Apply initial filtering if targetOrderId is present
+        if (targetOrderId) {
+          const filtered = acceptedDeliveries.filter(o => o._id === targetOrderId);
+          if (filtered.length > 0) {
+            setFilteredDeliveries(filtered);
+          } else {
+            setFilteredDeliveries(acceptedDeliveries);
+          }
+        } else {
+          setFilteredDeliveries(acceptedDeliveries);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch deliveries:', error);
@@ -67,6 +81,11 @@ const AdminDeliveryTrackingScreen = ({ navigation }) => {
   };
 
   const getFilteredDeliveries = () => {
+    // If we have a target order and haven't cleared it, show only that
+    if (targetOrderId && filteredDeliveries.length === 1 && deliveries.length > 1) {
+      return filteredDeliveries;
+    }
+
     if (filterStatus === 'all') return deliveries;
     if (filterStatus === 'delivered') {
       return deliveries.filter(d => d.deliveryTracking?.status === 'delivered');
@@ -131,7 +150,6 @@ const AdminDeliveryTrackingScreen = ({ navigation }) => {
     );
   }
 
-  const filteredDeliveries = getFilteredDeliveries();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -139,6 +157,21 @@ const AdminDeliveryTrackingScreen = ({ navigation }) => {
       <AdminNavbar navigation={navigation} title="Delivery Tracking" />
 
       <FilterTabs />
+
+      {targetOrderId && filteredDeliveries.length === 1 && deliveries.length > 1 && (
+        <View style={styles.filterBanner}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <MaterialCommunityIcons name="filter-variant" size={16} color="#92400E" />
+            <Text style={styles.filterBannerText}>Showing specific order</Text>
+          </View>
+          <TouchableOpacity 
+            onPress={() => setFilteredDeliveries(deliveries)}
+            style={{ backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 }}
+          >
+            <Text style={styles.clearFilterText}>Show All</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {filteredDeliveries.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -235,6 +268,26 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 8,
     textAlign: 'center',
+  },
+  filterBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FDE68A',
+  },
+  filterBannerText: {
+    fontSize: 13,
+    color: '#92400E',
+    fontWeight: '500',
+  },
+  clearFilterText: {
+    fontSize: 13,
+    color: '#3B82F6',
+    fontWeight: '600',
   },
 });
 

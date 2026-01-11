@@ -292,7 +292,7 @@ const VendorDashboardScreen = ({ navigation }) => {
             <StatCard
               title="Pending Requests"
               value={dashboardData.stats.pendingRequests}
-              onPress={() => navigation.navigate('MaterialRequests')}
+              onPress={() => navigation.navigate('MaterialRequests', { initialTab: 'accepted' })}
             />
             <StatCard
               title="Quotations Sent"

@@ -21,22 +21,55 @@ const ProjectDetailsScreen = ({ route, navigation }) => {
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [team, setTeam] = useState([]);
+  const [timelineEvents, setTimelineEvents] = useState([]);
+  const [invoiceStats, setInvoiceStats] = useState({ total: 0, paid: 0, overdue: 0, pending: 0 });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
+  const getClientDisplayName = (client) => {
+    if (!client) return 'N/A';
+    if (typeof client === 'string') return client;
+    const fullName = `${client.firstName || ''} ${client.lastName || ''}`.trim();
+    return fullName || client.email || 'N/A';
+  };
+
   const loadProjectData = async () => {
     try {
-      const allProjects = await api.getProjects();
-      const foundProject = allProjects.find(p => p._id === projectId) || allProjects[0];
+      const [foundProject, projectTasks, events, invoices] = await Promise.all([
+        api.getProjectById(projectId),
+        api.getProjectTasks(projectId).catch(() => []),
+        api.getProjectTimeline(projectId, { limit: 50 }).catch(() => []),
+        api.getProjectInvoices(projectId, { limit: 200 }).catch(() => []),
+      ]);
+
       setProject(foundProject);
 
-      // Get all tasks and filter for this project
-      const allTasks = await api.getTasks();
-      setTasks(allTasks.filter(t => t.project === projectId).slice(0, 10));
+      // Normalize task fields from backend model
+      const normalizedTasks = (projectTasks || []).map(t => ({
+        _id: t._id,
+        title: t.taskName,
+        description: t.taskDescription,
+        status: t.status,
+        priority: t.priority,
+        dueDate: t.date,
+        time: t.time,
+        assigneeName: t.assignedTo ? `${t.assignedTo.firstName || ''} ${t.assignedTo.lastName || ''}`.trim() : 'Unassigned',
+      }));
+      setTasks(normalizedTasks);
 
-      // Get team members (employees assigned to project)
-      const allUsers = await api.getUsers('employee');
-      setTeam(allUsers.slice(0, 5)); // Mock: first 5 employees
+      setTimelineEvents(Array.isArray(events) ? events : []);
+
+      // Team members from project (employees + vendors)
+      const employees = foundProject?.assignedEmployees || [];
+      const vendors = foundProject?.assignedVendors || [];
+      setTeam([...(Array.isArray(employees) ? employees : []), ...(Array.isArray(vendors) ? vendors : [])]);
+
+      // Invoice stats
+      const inv = Array.isArray(invoices) ? invoices : [];
+      const paid = inv.filter(i => i.status === 'paid').length;
+      const overdue = inv.filter(i => i.status === 'overdue').length;
+      const pending = inv.filter(i => i.status === 'pending' || i.status === 'partial').length;
+      setInvoiceStats({ total: inv.length, paid, overdue, pending });
 
     } catch (error) {
       console.error("Failed to load project details", error);
@@ -76,7 +109,7 @@ const ProjectDetailsScreen = ({ route, navigation }) => {
   }
 
   const getStatusConfig = (status, priority) => {
-    if (priority === 'high' || status === 'planning') {
+    if (priority === 'high' || priority === 'urgent' || status === 'planning') {
       return { emoji: '🔴', text: 'DELAYED', color: '#D32F2F' };
     }
     if (status === 'on-hold') {
@@ -89,14 +122,18 @@ const ProjectDetailsScreen = ({ route, navigation }) => {
   };
 
   const calculateProgress = () => {
-    if (project.status === 'completed') return 100;
-    if (project.status === 'in-progress') return Math.floor(Math.random() * 40) + 40;
-    return Math.floor(Math.random() * 30) + 10;
+    const p = project?.progress?.percentage;
+    if (typeof p === 'number' && !Number.isNaN(p)) {
+      return Math.max(0, Math.min(100, Math.round(p)));
+    }
+    if (project?.status === 'completed') return 100;
+    return 0;
   };
 
   const calculateDaysLeft = () => {
-    if (!project.endDate) return 'N/A';
-    const end = new Date(project.endDate);
+    const endDate = project?.timeline?.expectedEndDate || project?.timeline?.actualEndDate;
+    if (!endDate) return 'N/A';
+    const end = new Date(endDate);
     const today = new Date();
     const diff = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
     return diff > 0 ? `${diff} days left` : `${Math.abs(diff)} days overdue`;
@@ -106,12 +143,17 @@ const ProjectDetailsScreen = ({ route, navigation }) => {
   const progress = calculateProgress();
   const daysLeft = calculateDaysLeft();
 
-  const phases = [
-    { id: 1, name: 'Phase 1: Design', status: 'completed', startDate: 'Oct 15', endDate: 'Nov 10' },
-    { id: 2, name: 'Phase 2: Foundation', status: 'completed', startDate: 'Nov 11', endDate: 'Dec 05' },
-    { id: 3, name: 'Phase 3: Structure', status: 'in-progress', startDate: 'Dec 06', endDate: 'Jan 15', issue: 'Material delay' },
-    { id: 4, name: 'Phase 4: Finishing', status: 'upcoming', startDate: 'Jan 16', endDate: 'Feb 20' },
-  ];
+  const milestoneEvents = (timelineEvents || []).filter(e => e.eventType === 'milestone');
+
+  const formatDateRange = (startDate, endDate) => {
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+    const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (start && end) return `${fmt(start)} - ${fmt(end)}`;
+    if (start) return fmt(start);
+    if (end) return fmt(end);
+    return '';
+  };
 
   const renderHeader = () => (
     <View style={styles.header}>
@@ -125,7 +167,7 @@ const ProjectDetailsScreen = ({ route, navigation }) => {
       </View>
       
       <Text style={styles.projectTitle} numberOfLines={2}>
-        {project.type === 'residential' ? '🏠' : '🏢'} {project.title}
+        {project.projectType === 'residential' ? '🏠' : '🏢'} {project.title}
       </Text>
       
       <View style={[styles.statusBadge, { backgroundColor: statusConfig.color + '30' }]}>
@@ -136,7 +178,7 @@ const ProjectDetailsScreen = ({ route, navigation }) => {
       </View>
 
       <Text style={styles.dueDateText}>
-        Due: {project.endDate ? new Date(project.endDate).toLocaleDateString() : 'Not set'} • {daysLeft}
+        Due: {project.timeline?.expectedEndDate ? new Date(project.timeline.expectedEndDate).toLocaleDateString() : 'Not set'} • {daysLeft}
       </Text>
 
       <View style={styles.progressSection}>
@@ -156,6 +198,7 @@ const ProjectDetailsScreen = ({ route, navigation }) => {
       {[
         { id: 'overview', label: 'OVERVIEW', icon: 'grid-outline' },
         { id: 'tasks', label: 'TASKS', icon: 'checkbox-outline' },
+        { id: 'payments', label: 'PAYMENTS', icon: 'cash-outline' },
         { id: 'team', label: 'TEAM', icon: 'people-outline' }
       ].map((tab) => (
         <TouchableOpacity 
@@ -188,86 +231,85 @@ const ProjectDetailsScreen = ({ route, navigation }) => {
         </View>
 
         <View style={styles.timelineContainer}>
-          {phases.map((phase, index) => (
-            <View key={phase.id} style={styles.phaseContainer}>
-              <View style={styles.phaseIconContainer}>
-                {phase.status === 'completed' && (
-                  <View style={[styles.phaseIcon, { backgroundColor: '#4CAF50' }]}>
-                    <Ionicons name="checkmark" size={16} color="#fff" />
-                  </View>
-                )}
-                {phase.status === 'in-progress' && (
-                  <View style={[styles.phaseIcon, { backgroundColor: '#1976D2' }]}>
-                    <ActivityIndicator size="small" color="#fff" />
-                  </View>
-                )}
-                {phase.status === 'upcoming' && (
-                  <View style={[styles.phaseIcon, { backgroundColor: '#E0E0E0' }]}>
-                    <Text style={{ fontSize: 12 }}>○</Text>
-                  </View>
-                )}
-                {index < phases.length - 1 && (
-                  <View style={styles.phaseConnector} />
-                )}
-              </View>
+          {milestoneEvents.length === 0 ? (
+            <Text style={styles.emptyText}>No milestone updates yet</Text>
+          ) : (
+            milestoneEvents.slice(0, 8).map((event, index) => (
+              <View key={event._id || index} style={styles.phaseContainer}>
+                <View style={styles.phaseIconContainer}>
+                  {event.status === 'completed' ? (
+                    <View style={[styles.phaseIcon, { backgroundColor: '#4CAF50' }]}>
+                      <Ionicons name="checkmark" size={16} color="#fff" />
+                    </View>
+                  ) : (
+                    <View style={[styles.phaseIcon, { backgroundColor: '#1976D2' }]}>
+                      <ActivityIndicator size="small" color="#fff" />
+                    </View>
+                  )}
+                  {index < milestoneEvents.slice(0, 8).length - 1 && (
+                    <View style={styles.phaseConnector} />
+                  )}
+                </View>
 
-              <View style={styles.phaseContent}>
-                <Text style={styles.phaseName}>{phase.name}</Text>
-                <Text style={styles.phaseDates}>
-                  {phase.startDate} - {phase.endDate}
-                </Text>
-                {phase.status === 'in-progress' && (
-                  <Text style={styles.phaseCurrentTag}>▶ Current Stage</Text>
-                )}
-                {phase.issue && (
-                  <View style={styles.phaseIssue}>
-                    <Ionicons name="alert-circle" size={14} color="#D32F2F" />
-                    <Text style={styles.phaseIssueText}>⚠️ {phase.issue}</Text>
-                  </View>
-                )}
+                <View style={styles.phaseContent}>
+                  <Text style={styles.phaseName}>{event.title}</Text>
+                  <Text style={styles.phaseDates}>
+                    {formatDateRange(event.startDate, event.endDate) || new Date(event.createdAt).toLocaleDateString()}
+                  </Text>
+                  {event.description ? (
+                    <Text style={styles.phaseCurrentTag} numberOfLines={2}>{event.description}</Text>
+                  ) : null}
+                </View>
               </View>
-            </View>
-          ))}
+            ))
+          )}
         </View>
       </View>
 
       {/* Financial Snapshot */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>💰 FINANCIAL SNAPSHOT</Text>
-        
-        <View style={styles.budgetGrid}>
-          <View style={styles.budgetItem}>
-            <Text style={styles.budgetLabel}>Budget</Text>
-            <Text style={styles.budgetAmount}>
-              ₹{project.budget?.estimated?.toLocaleString() || '0'}
-            </Text>
-          </View>
-          <View style={styles.budgetDivider} />
-          <View style={styles.budgetItem}>
-            <Text style={styles.budgetLabel}>Used</Text>
-            <Text style={[styles.budgetAmount, { color: '#FBC02D' }]}>
-              ₹{Math.floor((project.budget?.estimated || 0) * 0.6).toLocaleString()}
-            </Text>
-          </View>
-          <View style={styles.budgetDivider} />
-          <View style={styles.budgetItem}>
-            <Text style={styles.budgetLabel}>Remaining</Text>
-            <Text style={[styles.budgetAmount, { color: '#4CAF50' }]}>
-              ₹{Math.floor((project.budget?.estimated || 0) * 0.4).toLocaleString()}
-            </Text>
-          </View>
-        </View>
 
-        <View style={styles.budgetBar}>
-          <View style={styles.budgetBarFill} />
-        </View>
-        <Text style={styles.budgetNote}>📉 60% Used (Healthy)</Text>
+        {(() => {
+          const estimated = project.budget?.estimated || 0;
+          const actual = project.budget?.actual || 0;
+          const remaining = Math.max(0, estimated - actual);
+          const pct = estimated > 0 ? Math.round((actual / estimated) * 100) : 0;
+
+          return (
+            <>
+              <View style={styles.budgetGrid}>
+                <View style={styles.budgetItem}>
+                  <Text style={styles.budgetLabel}>Budget</Text>
+                  <Text style={styles.budgetAmount}>₹{Number(estimated).toLocaleString()}</Text>
+                </View>
+                <View style={styles.budgetDivider} />
+                <View style={styles.budgetItem}>
+                  <Text style={styles.budgetLabel}>Used</Text>
+                  <Text style={[styles.budgetAmount, { color: '#FBC02D' }]}>₹{Number(actual).toLocaleString()}</Text>
+                </View>
+                <View style={styles.budgetDivider} />
+                <View style={styles.budgetItem}>
+                  <Text style={styles.budgetLabel}>Remaining</Text>
+                  <Text style={[styles.budgetAmount, { color: '#4CAF50' }]}>₹{Number(remaining).toLocaleString()}</Text>
+                </View>
+              </View>
+
+              <View style={styles.budgetBar}>
+                <View style={[styles.budgetBarFill, { width: `${Math.max(0, Math.min(100, pct))}%` }]} />
+              </View>
+              <Text style={styles.budgetNote}>📉 {pct}% Used</Text>
+            </>
+          );
+        })()}
 
         <TouchableOpacity 
           style={styles.invoiceLink}
           onPress={() => navigation.navigate('Finance', { screen: 'Invoices' })}
         >
-          <Text style={styles.invoiceLinkText}>📄 Invoices: 2 Paid, 1 Overdue</Text>
+          <Text style={styles.invoiceLinkText}>
+            📄 Invoices: {invoiceStats.paid} Paid, {invoiceStats.overdue} Overdue, {invoiceStats.pending} Pending
+          </Text>
           <Ionicons name="chevron-forward" size={16} color="#1976D2" />
         </TouchableOpacity>
       </View>
@@ -290,7 +332,7 @@ const ProjectDetailsScreen = ({ route, navigation }) => {
           <Ionicons name="person" size={18} color="#666" />
           <View style={styles.detailContent}>
             <Text style={styles.detailLabel}>Client</Text>
-            <Text style={styles.detailValue}>{project.client || 'N/A'}</Text>
+            <Text style={styles.detailValue}>{getClientDisplayName(project.client)}</Text>
           </View>
         </View>
 
@@ -299,8 +341,8 @@ const ProjectDetailsScreen = ({ route, navigation }) => {
           <View style={styles.detailContent}>
             <Text style={styles.detailLabel}>Duration</Text>
             <Text style={styles.detailValue}>
-              {project.startDate && project.endDate ? 
-                `${Math.ceil((new Date(project.endDate) - new Date(project.startDate)) / (1000 * 60 * 60 * 24))} days` 
+              {project.timeline?.startDate && (project.timeline?.expectedEndDate || project.timeline?.actualEndDate) ? 
+                `${Math.ceil((new Date(project.timeline.expectedEndDate || project.timeline.actualEndDate) - new Date(project.timeline.startDate)) / (1000 * 60 * 60 * 24))} days` 
                 : 'N/A'}
             </Text>
           </View>
@@ -310,7 +352,7 @@ const ProjectDetailsScreen = ({ route, navigation }) => {
           <Ionicons name="build" size={18} color="#666" />
           <View style={styles.detailContent}>
             <Text style={styles.detailLabel}>Type</Text>
-            <Text style={styles.detailValue}>{project.type || 'N/A'}</Text>
+            <Text style={styles.detailValue}>{project.projectType || 'N/A'}</Text>
           </View>
         </View>
       </View>
@@ -488,6 +530,65 @@ const ProjectDetailsScreen = ({ route, navigation }) => {
     </ScrollView>
   );
 
+  const renderPayments = () => {
+    const schedule = project.paymentSchedule || [];
+    
+    return (
+      <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>💳 PAYMENT SCHEDULE</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('ProjectPayments', { projectId: project._id })}>
+              <Text style={styles.cardAction}>View Full →</Text>
+            </TouchableOpacity>
+          </View>
+
+          {schedule.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="cash-outline" size={48} color="#eee" />
+              <Text style={styles.emptyText}>No payment schedule defined</Text>
+            </View>
+          ) : (
+            schedule.map((item, index) => {
+              const isPaid = item.status === 'paid';
+              const isOverdue = !isPaid && new Date(item.dueDate) < new Date();
+              
+              return (
+                <View key={item._id || index} style={styles.paymentItem}>
+                  <View style={[
+                    styles.paymentStatusDot, 
+                    { backgroundColor: isPaid ? '#4CAF50' : (isOverdue ? '#D32F2F' : '#FBC02D') }
+                  ]} />
+                  <View style={styles.paymentInfo}>
+                    <Text style={styles.paymentName}>{item.name || `Installment ${index + 1}`}</Text>
+                    <Text style={styles.paymentDate}>Due: {new Date(item.dueDate).toLocaleDateString()}</Text>
+                  </View>
+                  <View style={styles.paymentRight}>
+                    <Text style={styles.paymentAmount}>₹{item.amount.toLocaleString()}</Text>
+                    <Text style={[
+                      styles.paymentStatusText,
+                      { color: isPaid ? '#4CAF50' : (isOverdue ? '#D32F2F' : '#FBC02D') }
+                    ]}>
+                      {item.status.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+
+        <TouchableOpacity 
+          style={styles.createInvoiceBtn}
+          onPress={() => navigation.navigate('CreateInvoice', { projectId: project._id })}
+        >
+          <Ionicons name="add-circle-outline" size={20} color="#fff" />
+          <Text style={styles.createInvoiceText}>Create New Invoice</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1A1A1A" />
@@ -496,6 +597,7 @@ const ProjectDetailsScreen = ({ route, navigation }) => {
       <View style={styles.contentContainer}>
         {activeTab === 'overview' && renderOverview()}
         {activeTab === 'tasks' && renderTasks()}
+        {activeTab === 'payments' && renderPayments()}
         {activeTab === 'team' && renderTeam()}
       </View>
     </SafeAreaView>
@@ -1005,6 +1107,65 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#1976D2',
     fontWeight: '600'
+  },
+  paymentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee'
+  },
+  paymentStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 12
+  },
+  paymentInfo: {
+    flex: 1
+  },
+  paymentName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2
+  },
+  paymentDate: {
+    fontSize: 12,
+    color: '#888'
+  },
+  paymentRight: {
+    alignItems: 'flex-end'
+  },
+  paymentAmount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 2
+  },
+  paymentStatusText: {
+    fontSize: 10,
+    fontWeight: 'bold'
+  },
+  createInvoiceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1976D2',
+    margin: 16,
+    padding: 14,
+    borderRadius: 12,
+    gap: 8
+  },
+  createInvoiceText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 'bold'
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40
   }
 });
 

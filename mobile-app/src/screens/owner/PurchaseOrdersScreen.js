@@ -15,8 +15,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { purchaseOrdersAPI } from '../../utils/api';
 import AdminNavbar from '../../components/AdminNavbar';
 
-const PurchaseOrdersScreen = ({ navigation }) => {
+const PurchaseOrdersScreen = ({ navigation, route }) => {
+    const targetOrderId = route?.params?.orderId;
     const [orders, setOrders] = useState([]);
+    const [filteredOrders, setFilteredOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
 
@@ -39,6 +41,18 @@ const PurchaseOrdersScreen = ({ navigation }) => {
                 amount: order.totalAmount || order.finalAmount || order.amount || 0,
             }));
             setOrders(normalizedOrders);
+
+            // Apply initial filtering if targetOrderId is present
+            if (targetOrderId) {
+                const filtered = normalizedOrders.filter(o => o.id === targetOrderId || o._id === targetOrderId);
+                if (filtered.length > 0) {
+                    setFilteredOrders(filtered);
+                } else {
+                    setFilteredOrders(normalizedOrders);
+                }
+            } else {
+                setFilteredOrders(normalizedOrders);
+            }
         } catch (error) {
             console.error(error);
         } finally {
@@ -52,10 +66,17 @@ const PurchaseOrdersScreen = ({ navigation }) => {
         }, [])
     );
 
-    const filteredList = orders.filter(item => 
-        (item.poNumber || '').toLowerCase().includes(search.toLowerCase()) ||
-        (item.vendorName || '').toLowerCase().includes(search.toLowerCase())
-    );
+    const getDisplayList = () => {
+        // If we have a target order and haven't cleared it, show only that
+        if (targetOrderId && filteredOrders.length === 1 && orders.length > 1) {
+            return filteredOrders;
+        }
+
+        return orders.filter(item => 
+            (item.poNumber || '').toLowerCase().includes(search.toLowerCase()) ||
+            (item.vendorName || '').toLowerCase().includes(search.toLowerCase())
+        );
+    };
 
     const renderItem = ({ item }) => {
         // Map delivery tracking status to display status
@@ -125,8 +146,23 @@ const PurchaseOrdersScreen = ({ navigation }) => {
                 />
             </View>
 
+            {targetOrderId && filteredOrders.length === 1 && orders.length > 1 && (
+                <View style={styles.filterBanner}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Ionicons name="filter" size={16} color="#92400E" />
+                        <Text style={styles.filterBannerText}>Showing specific order</Text>
+                    </View>
+                    <TouchableOpacity 
+                        onPress={() => setFilteredOrders(orders)}
+                        style={{ backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 }}
+                    >
+                        <Text style={styles.clearFilterText}>Show All</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
             <FlatList
-                data={filteredList}
+                data={getDisplayList()}
                 keyExtractor={item => item.id}
                 renderItem={renderItem}
                 contentContainerStyle={styles.listContent}
@@ -171,6 +207,26 @@ const styles = StyleSheet.create({
     eta: { fontSize: 10, color: '#D32F2F', fontWeight: 'bold' },
     cardAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
     cardActionText: { fontSize: 12, color: '#9CA3AF', marginRight: 4 },
+    filterBanner: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#FDE68A',
+    },
+    filterBannerText: {
+        fontSize: 13,
+        color: '#92400E',
+        fontWeight: '500',
+    },
+    clearFilterText: {
+        fontSize: 13,
+        color: '#3B82F6',
+        fontWeight: '600',
+    },
 });
 
 export default PurchaseOrdersScreen;

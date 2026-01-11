@@ -144,20 +144,70 @@ router.post('/', authenticate, async (req, res) => {
  */
 router.get('/', authenticate, async (req, res) => {
     try {
-        console.log('[Invoice] Fetching all invoices');
+        console.log('[Invoice] Fetching all invoices and project payment schedules');
         
+        // Fetch actual invoices
         const invoices = await ClientInvoice.find()
             .populate('clientId', 'firstName lastName email')
             .populate('projectId', 'title')
             .sort({ createdAt: -1 })
             .lean();
 
-        console.log('[Invoice] Found', invoices.length, 'invoices');
+        // Fetch projects with payment schedules
+        const projectsWithSchedules = await Project.find({ 
+            'paymentSchedule.0': { $exists: true } 
+        })
+        .populate('client', 'firstName lastName email')
+        .select('title client paymentSchedule')
+        .lean();
+
+        // Transform payment schedules into "virtual invoices"
+        const scheduleInvoices = [];
+        const today = new Date();
+        
+        projectsWithSchedules.forEach(project => {
+            if (project.paymentSchedule && project.paymentSchedule.length > 0) {
+                project.paymentSchedule.forEach((item, index) => {
+                    let status = item.status || 'pending';
+                    const dueDate = item.dueDate ? new Date(item.dueDate) : null;
+                    
+                    // Dynamically determine if overdue
+                    if (status === 'pending' && dueDate && dueDate < today) {
+                        status = 'overdue';
+                    }
+
+                    scheduleInvoices.push({
+                        _id: `sched-${project._id}-${index}`,
+                        invoiceNumber: `SCHED-${index + 1}`,
+                        clientId: project.client,
+                        projectId: {
+                            _id: project._id,
+                            title: project.title
+                        },
+                        totalAmount: item.amount,
+                        dueDate: item.dueDate,
+                        status: status,
+                        isSchedule: true,
+                        installmentName: item.name,
+                        createdAt: item.createdAt || project.createdAt || new Date()
+                    });
+                });
+            }
+        });
+
+        // Combine and sort by date (latest first)
+        const allItems = [...invoices, ...scheduleInvoices].sort((a, b) => {
+            const dateA = new Date(a.createdAt || 0);
+            const dateB = new Date(b.createdAt || 0);
+            return dateB - dateA;
+        });
+
+        console.log('[Invoice] Found', invoices.length, 'invoices and', scheduleInvoices.length, 'schedules');
 
         res.status(200).json({
             success: true,
             data: {
-                invoices: invoices || []
+                invoices: allItems
             }
         });
     } catch (error) {

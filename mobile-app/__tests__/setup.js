@@ -1,4 +1,40 @@
-import 'react-native-gesture-handler/jestSetup';
+// Mock react-native-gesture-handler (avoid native module resolution in Jest)
+jest.mock('react-native-gesture-handler', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+
+  const MockGestureHandler = React.forwardRef((props, ref) => React.createElement(View, { ...props, ref }, props.children));
+  MockGestureHandler.displayName = 'MockGestureHandler';
+
+  return {
+    Directions: {},
+    State: {},
+    GestureHandlerRootView: View,
+    PanGestureHandler: MockGestureHandler,
+    TapGestureHandler: MockGestureHandler,
+    LongPressGestureHandler: MockGestureHandler,
+    RotationGestureHandler: MockGestureHandler,
+    FlingGestureHandler: MockGestureHandler,
+    NativeViewGestureHandler: MockGestureHandler,
+    Swipeable: View,
+    DrawerLayout: View,
+  };
+});
+
+// Prevent DevMenu TurboModule errors in Jest
+jest.mock('react-native/src/private/devsupport/devmenu/specs/NativeDevMenu', () => ({}));
+jest.mock('react-native/src/private/devsupport/devmenu/DevMenu', () => ({}));
+
+// NativeEventEmitter can throw if constructed with null
+jest.mock('react-native/Libraries/EventEmitter/NativeEventEmitter', () => {
+  return function NativeEventEmitter() {
+    return {
+      addListener: jest.fn(),
+      removeAllListeners: jest.fn(),
+      removeSubscription: jest.fn(),
+    };
+  };
+});
 
 // Mock react-native modules
 jest.mock('react-native-reanimated', () => {
@@ -40,16 +76,13 @@ jest.mock('expo-status-bar', () => ({
   StatusBar: 'StatusBar',
 }));
 
-// Mock Alert
-jest.mock('react-native', () => {
-  const RN = jest.requireActual('react-native');
-  return {
-    ...RN,
-    Alert: {
-      alert: jest.fn(),
-    },
-  };
-});
+// KeyboardAvoidingView subscribes to Keyboard events; ensure listeners are removable in Jest
+jest.mock('react-native/Libraries/Components/Keyboard/Keyboard', () => ({
+  addListener: jest.fn(() => ({ remove: jest.fn() })),
+  isVisible: jest.fn(() => false),
+  removeListener: jest.fn(),
+  dismiss: jest.fn(),
+}));
 
 // Mock axios
 jest.mock('axios', () => ({
@@ -72,6 +105,15 @@ jest.mock('axios', () => ({
   put: jest.fn(),
   delete: jest.fn(),
 }));
+
+// Mock picker (native module) for Jest
+jest.mock('@react-native-picker/picker', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const Picker = ({ children, ...props }) => React.createElement(View, props, children);
+  const Item = () => null;
+  return { Picker, Item };
+});
 
 // Global test utilities
 global.mockNavigation = {

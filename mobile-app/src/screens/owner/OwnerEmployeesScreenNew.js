@@ -508,6 +508,16 @@ const EmployeeAttendanceModal = ({ visible, employee, attendanceRecords, project
 
 // Main Screen Component
 const OwnerEmployeesScreen = ({ navigation }) => {
+    const toLocalDateKey = (value) => {
+        if (!value) return null;
+        const d = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(d.getTime())) return null;
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    };
+
     const [employees, setEmployees] = useState([]);
     const [projects, setProjects] = useState([]);
     const [allAttendance, setAllAttendance] = useState([]);
@@ -550,7 +560,8 @@ const OwnerEmployeesScreen = ({ navigation }) => {
             // Process attendance by date
             const byDate = {};
             (attendanceData || []).forEach(record => {
-                const dateStr = new Date(record.date).toISOString().split('T')[0];
+                const dateStr = toLocalDateKey(record.date);
+                if (!dateStr) return;
                 if (!byDate[dateStr]) {
                     byDate[dateStr] = {
                         presentCount: 0,
@@ -565,7 +576,7 @@ const OwnerEmployeesScreen = ({ navigation }) => {
             setAttendanceByDate(byDate);
             
             // Calculate stats
-            const today = new Date().toISOString().split('T')[0];
+            const today = toLocalDateKey(new Date());
             const todayData = byDate[today];
             
             setStats({
@@ -700,10 +711,8 @@ const OwnerEmployeesScreen = ({ navigation }) => {
                         const empRecords = allAttendance.filter(r => 
                             r.user?._id === emp._id || r.user === emp._id
                         );
-                        const today = new Date().toISOString().split('T')[0];
-                        const todayRecord = empRecords.find(r => 
-                            new Date(r.date).toISOString().split('T')[0] === today
-                        );
+                        const today = toLocalDateKey(new Date());
+                        const todayRecord = empRecords.find(r => toLocalDateKey(r.date) === today);
                         const isPresent = todayRecord && todayRecord.checkInTime;
                         
                         return (

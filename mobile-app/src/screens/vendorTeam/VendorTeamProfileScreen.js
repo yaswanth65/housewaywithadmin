@@ -16,7 +16,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { usersAPI, authAPI } from '../../utils/api';
 import ToastMessage from '../../components/common/ToastMessage';
-import { COLORS } from '../../styles/colors';
 import theme from '../../styles/theme';
 
 export default function VendorTeamProfileScreen({ navigation }) {
@@ -248,13 +247,13 @@ export default function VendorTeamProfileScreen({ navigation }) {
     const MenuItem = ({ icon, title, subtitle, onPress, danger }) => (
         <TouchableOpacity style={styles.menuItem} onPress={onPress}>
             <View style={[styles.menuIconContainer, danger && styles.dangerIconContainer]}>
-                <Feather name={icon} size={22} color={danger ? '#EF4444' : theme.colors.primary[600]} />
+                <Feather name={icon} size={22} color={danger ? theme.colors.error[600] : theme.colors.primary[600]} />
             </View>
             <View style={styles.menuContent}>
                 <Text style={[styles.menuTitle, danger && styles.dangerText]}>{title}</Text>
                 {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
             </View>
-            <Feather name="chevron-right" size={20} color="#999" />
+            <Feather name="chevron-right" size={20} color={theme.colors.text.muted} />
         </TouchableOpacity>
     );
 
@@ -301,15 +300,15 @@ export default function VendorTeamProfileScreen({ navigation }) {
                             )}
                             <View style={styles.editBadge}>
                                 {isSaving ? (
-                                    <ActivityIndicator size="small" color="#fff" />
+                                    <ActivityIndicator size="small" color={theme.colors.text.white} />
                                 ) : (
-                                    <Feather name="camera" size={14} color="#fff" />
+                                    <Feather name="camera" size={14} color={theme.colors.text.white} />
                                 )}
                             </View>
                         </TouchableOpacity>
                         {profileImage && !isSaving && (
                             <TouchableOpacity style={styles.deleteBadge} onPress={deletePhoto}>
-                                <Feather name="x" size={12} color="#fff" />
+                                <Feather name="x" size={12} color={theme.colors.text.white} />
                             </TouchableOpacity>
                         )}
                     </View>
@@ -399,7 +398,7 @@ export default function VendorTeamProfileScreen({ navigation }) {
                                 {otpStep === 3 && 'Set New Password'}
                             </Text>
                             <TouchableOpacity onPress={closeOtpModal} style={styles.closeButton}>
-                                <Feather name="x" size={24} color="#999" />
+                                <Feather name="x" size={24} color={theme.colors.text.muted} />
                             </TouchableOpacity>
                         </View>
 
@@ -413,10 +412,10 @@ export default function VendorTeamProfileScreen({ navigation }) {
                                     placeholder="your@email.com"
                                     keyboardType="email-address"
                                     autoCapitalize="none"
-                                    placeholderTextColor="#999"
+                                    placeholderTextColor={theme.colors.text.muted}
                                 />
                                 <TouchableOpacity style={styles.otpButton} onPress={requestOTP} disabled={otpLoading}>
-                                    {otpLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.otpButtonText}>Send OTP</Text>}
+                                    {otpLoading ? <ActivityIndicator color={theme.colors.text.white} /> : <Text style={styles.otpButtonText}>Send OTP</Text>}
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -431,10 +430,10 @@ export default function VendorTeamProfileScreen({ navigation }) {
                                     placeholder="000000"
                                     keyboardType="number-pad"
                                     maxLength={6}
-                                    placeholderTextColor="#999"
+                                    placeholderTextColor={theme.colors.text.muted}
                                 />
                                 <TouchableOpacity style={styles.otpButton} onPress={verifyOTP} disabled={otpLoading}>
-                                    {otpLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.otpButtonText}>Verify OTP</Text>}
+                                    {otpLoading ? <ActivityIndicator color={theme.colors.text.white} /> : <Text style={styles.otpButtonText}>Verify OTP</Text>}
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={requestOTP} style={styles.resendLink}>
                                     <Text style={styles.resendText}>Resend OTP</Text>
@@ -451,7 +450,7 @@ export default function VendorTeamProfileScreen({ navigation }) {
                                     onChangeText={(val) => setPasswordData(prev => ({ ...prev, newPassword: val }))}
                                     placeholder="New Password"
                                     secureTextEntry
-                                    placeholderTextColor="#999"
+                                    placeholderTextColor={theme.colors.text.muted}
                                 />
                                 <TextInput
                                     style={[styles.otpInput, { marginTop: 12 }]}
@@ -459,10 +458,10 @@ export default function VendorTeamProfileScreen({ navigation }) {
                                     onChangeText={(val) => setPasswordData(prev => ({ ...prev, confirmPassword: val }))}
                                     placeholder="Confirm Password"
                                     secureTextEntry
-                                    placeholderTextColor="#999"
+                                    placeholderTextColor={theme.colors.text.muted}
                                 />
                                 <TouchableOpacity style={styles.otpButton} onPress={resetPasswordWithOTP} disabled={otpLoading}>
-                                    {otpLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.otpButtonText}>Change Password</Text>}
+                                    {otpLoading ? <ActivityIndicator color={theme.colors.text.white} /> : <Text style={styles.otpButtonText}>Change Password</Text>}
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -516,7 +515,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    avatarText: { fontSize: 36, fontWeight: '700', color: '#1F2937' },
+    avatarText: { fontSize: 36, fontWeight: '700', color: theme.colors.text.white },
     editBadge: {
         position: 'absolute',
         bottom: 0,
@@ -537,7 +536,7 @@ const styles = StyleSheet.create({
         width: 24,
         height: 24,
         borderRadius: 12,
-        backgroundColor: '#EF4444',
+        backgroundColor: theme.colors.error[600],
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
@@ -586,11 +585,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginRight: 12,
     },
-    dangerIconContainer: { backgroundColor: '#FEE2E2' },
+    dangerIconContainer: { backgroundColor: theme.colors.error[50] },
     menuContent: { flex: 1 },
     menuTitle: { fontSize: 16, fontWeight: '500', color: theme.colors.text.primary, marginBottom: 2 },
     menuSubtitle: { fontSize: 13, color: theme.colors.text.secondary },
-    dangerText: { color: '#EF4444' },
+    dangerText: { color: theme.colors.error[600] },
     // OTP Modal
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
     otpModal: { backgroundColor: theme.colors.background.card, marginHorizontal: 24, borderRadius: 20, padding: 24, width: '90%', maxWidth: 400 },
@@ -599,23 +598,23 @@ const styles = StyleSheet.create({
     closeButton: { padding: 4 },
     otpLabel: { fontSize: 14, color: theme.colors.text.secondary, marginBottom: 12 },
     otpInput: {
-        backgroundColor: COLORS.inputBg,
+        backgroundColor: theme.colors.background.tertiary,
         borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 14,
         fontSize: 16,
-        color: COLORS.text,
+        color: theme.colors.text.primary,
         borderWidth: 1,
-        borderColor: COLORS.cardBorder,
+        borderColor: theme.colors.primary[100],
     },
     otpButton: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: theme.colors.primary[600],
         borderRadius: 12,
         paddingVertical: 14,
         alignItems: 'center',
         marginTop: 16,
     },
-    otpButtonText: { fontSize: 16, fontWeight: '600', color: '#1F2937' },
+    otpButtonText: { fontSize: 16, fontWeight: '600', color: theme.colors.text.white },
     resendLink: { alignItems: 'center', marginTop: 16 },
-    resendText: { fontSize: 14, color: COLORS.primary, fontWeight: '500' },
+    resendText: { fontSize: 14, color: theme.colors.primary[600], fontWeight: '500' },
 });

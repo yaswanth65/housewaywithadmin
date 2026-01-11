@@ -22,11 +22,16 @@ const ProjectsHubScreen = ({ navigation }) => {
         pending: 0,
         completed: 0
     });
+    const [recentUpdates, setRecentUpdates] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const fetchData = async () => {
         try {
-            const projects = await api.getProjects();
+            const [projects, updates] = await Promise.all([
+                    // Backend defaults to `limit=10`; hub stats should reflect all projects.
+                    api.getProjects({ limit: 1000 }),
+                api.getRecentProjectTimelineUpdates(10).catch(() => []),
+            ]);
             
             const onTrack = projects.filter(p => p.status === 'in-progress' && p.priority !== 'high').length;
             const atRisk = projects.filter(p => p.priority === 'high').length;
@@ -36,11 +41,20 @@ const ProjectsHubScreen = ({ navigation }) => {
             const completed = projects.filter(p => p.status === 'completed').length;
 
             setStats({ onTrack, atRisk, active, pending, completed });
+            setRecentUpdates(Array.isArray(updates) ? updates : []);
         } catch (error) {
             console.error(error);
         } finally {
             setLoading(false);
         }
+    };
+
+    const formatUpdateMeta = (update) => {
+        const createdAt = update?.createdAt ? new Date(update.createdAt) : null;
+        const createdBy = update?.createdBy ? `${update.createdBy.firstName || ''} ${update.createdBy.lastName || ''}`.trim() : '';
+        const timeText = createdAt ? createdAt.toLocaleString() : '';
+        const metaParts = [createdBy, timeText].filter(Boolean);
+        return metaParts.join(' • ');
     };
 
     useFocusEffect(
@@ -61,7 +75,7 @@ const ProjectsHubScreen = ({ navigation }) => {
                     <Ionicons name="menu" size={24} color="#333" style={{ marginRight: 16 }} />
                     <Text style={styles.headerTitle}>Projects</Text>
                 </View>
-                <TouchableOpacity style={styles.newBtn}>
+                <TouchableOpacity style={styles.newBtn} onPress={() => navigation.navigate('CreateProject')}>
                     <Text style={styles.newBtnText}>+ New ⚡</Text>
                 </TouchableOpacity>
             </View>
@@ -126,6 +140,48 @@ const ProjectsHubScreen = ({ navigation }) => {
                     <View style={styles.divider} />
                     <Text style={styles.alertItem}>🟡 Website: Budget exceeded 10%</Text>
                 </View>
+
+                {/* Recent Updates */}
+                <Text style={[styles.sectionTitle, { marginTop: 24 }]}>RECENT UPDATES</Text>
+                {recentUpdates.length === 0 ? (
+                    <View style={styles.emptyUpdatesCard}>
+                        <Text style={styles.emptyUpdatesText}>No recent project updates yet.</Text>
+                    </View>
+                ) : (
+                    <View style={styles.updatesCard}>
+                        {recentUpdates.slice(0, 10).map((u) => {
+                            const project = u?.projectId;
+                            const projectTitle = project?.title || 'Project';
+                            const title = u?.title || 'Update';
+                            const description = u?.description || '';
+                            return (
+                                <TouchableOpacity
+                                    key={u._id}
+                                    style={styles.updateRow}
+                                    onPress={() => {
+                                        if (project?._id) navigation.navigate('ProjectDetails', { projectId: project._id });
+                                    }}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.updateTitle} numberOfLines={1}>
+                                            {projectTitle}: {title}
+                                        </Text>
+                                        {!!description && (
+                                            <Text style={styles.updateDesc} numberOfLines={2}>
+                                                {description}
+                                            </Text>
+                                        )}
+                                        <Text style={styles.updateMeta} numberOfLines={1}>
+                                            {formatUpdateMeta(u)}
+                                        </Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={18} color="#ccc" />
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                )}
 
             </ScrollView>
         </SafeAreaView>
@@ -253,6 +309,46 @@ const styles = StyleSheet.create({
     divider: {
         height: 1,
         backgroundColor: '#eee'
+    },
+    updatesCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#eee'
+    },
+    updateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f1f1'
+    },
+    updateTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#333',
+        marginBottom: 2
+    },
+    updateDesc: {
+        fontSize: 13,
+        color: '#555',
+        marginBottom: 6
+    },
+    updateMeta: {
+        fontSize: 12,
+        color: '#888'
+    },
+    emptyUpdatesCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#eee'
+    },
+    emptyUpdatesText: {
+        fontSize: 13,
+        color: '#888'
     }
 });
 

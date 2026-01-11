@@ -97,22 +97,30 @@ const ProjectDetailScreen = ({ navigation, route }) => {
           setMilestones([]);
         }
 
-        // Initialize payment schedule from project (add IDs for frontend state)
-        if (proj.paymentSchedule && proj.paymentSchedule.length > 0) {
-          const scheduleWithIds = proj.paymentSchedule.map((payment, index) => ({
-            ...payment,
-            id: payment._id || `payment_${Date.now()}_${index}` // Use MongoDB _id or generate temporary ID
-          }));
-          setPaymentSchedule(scheduleWithIds);
-        } else {
-          setPaymentSchedule([]);
-        }
+        // Initialize payment schedule from project (fallback: installments)
+        const rawSchedule =
+          Array.isArray(proj.paymentSchedule) && proj.paymentSchedule.length > 0
+            ? proj.paymentSchedule
+            : Array.isArray(proj.installments) && proj.installments.length > 0
+              ? proj.installments
+              : [];
+
+        const scheduleWithIds = rawSchedule.map((payment, index) => {
+          const name = payment.name || payment.title || `Payment ${index + 1}`;
+          const amount = Number(payment.amount ?? 0);
+          const dueDate = payment.dueDate || null;
+          const status = payment.status || 'pending';
+          const id = payment._id || payment.id || `payment_${Date.now()}_${index}`;
+          return { ...payment, id, name, amount, dueDate, status };
+        });
+
+        setPaymentSchedule(scheduleWithIds);
 
         // Initialize edit form
         setEditForm({
           title: proj.title || '',
           budget: String(proj.budget?.estimated || ''),
-          endDate: proj.timeline?.endDate || '',
+          endDate: proj.timeline?.expectedEndDate || '',
         });
       }
     } catch (error) {
@@ -133,10 +141,10 @@ const ProjectDetailScreen = ({ navigation, route }) => {
     if (payment) {
       setEditingPayment(payment);
       setPaymentForm({
-        name: payment.name,
-        amount: String(payment.amount),
+        name: payment.name || payment.title || '',
+        amount: String(payment.amount ?? ''),
         dueDate: payment.dueDate || new Date().toISOString(),
-        status: payment.status,
+        status: payment.status || 'pending',
       });
     } else {
       setEditingPayment(null);
@@ -157,6 +165,7 @@ const ProjectDetailScreen = ({ navigation, route }) => {
       amount: parseFloat(paymentForm.amount),
       dueDate: paymentForm.dueDate || new Date().toISOString(),
       status: paymentForm.status,
+      createdAt: editingPayment?.createdAt || new Date().toISOString(),
     };
 
     if (editingPayment) {
@@ -215,7 +224,8 @@ const ProjectDetailScreen = ({ navigation, route }) => {
         name: payment.name,
         amount: payment.amount,
         dueDate: payment.dueDate,
-        status: payment.status || 'pending'
+        status: payment.status || 'pending',
+        createdAt: payment.createdAt || new Date().toISOString()
       }));
 
       await projectsAPI.updateProject(projectId, {
@@ -835,7 +845,7 @@ const PaymentsTab = ({ paymentSchedule, onAdd, onEdit, onToggle, onDelete }) => 
             <View style={styles.paymentInfo}>
               <Text style={styles.paymentName}>{payment.name}</Text>
               <Text style={styles.paymentDue}>
-                Due: {new Date(payment.dueDate).toLocaleDateString()}
+                Due: {payment.dueDate ? new Date(payment.dueDate).toLocaleDateString() : 'N/A'}
               </Text>
             </View>
             <TouchableOpacity
@@ -1008,66 +1018,41 @@ const FilesTab = ({ projectId, onUploadSuccess }) => {
 
   const uploadFile = async (fileAsset) => {
     try {
-      console.log('[Upload] Starting upload for:', {
-        name: fileAsset.name,
-        type: fileAsset.mimeType,
-        size: fileAsset.size,
-        hasFileObj: !!fileAsset.file,
-        platform: Platform.OS
-      });
       setUploading(true);
 
+      if (!fileAsset) {
+        throw new Error('No file selected');
+      }
+
       const formData = new FormData();
+      const desiredName = (fileName || fileAsset.name || 'upload').trim();
 
       if (Platform.OS === 'web') {
-        console.log('[Upload] Web detected, creating File object from:', {
-          uri: fileAsset.uri,
-          name: fileName || fileAsset.name,
-          type: fileAsset.mimeType
-        });
-
-        try {
+        // Expo DocumentPicker on web provides `file` (File). Prefer that.
+        if (fileAsset.file instanceof File) {
+          const f = fileAsset.file;
+          const fileToSend = desiredName && desiredName !== f.name
+            ? new File([f], desiredName, { type: f.type || fileAsset.mimeType || 'application/octet-stream' })
+            : f;
+          formData.append('file', fileToSend);
+        } else if (fileAsset.uri) {
+          // Fallback: fetch the blob URL/data URL
           const response = await fetch(fileAsset.uri);
           const blob = await response.blob();
-
-          console.log('[Upload] Blob fetched:', {
-            size: blob.size,
-            type: blob.type
-          });
-
-          // Create a proper File object with name and type for web
-          const file = new File(
+          const fileToSend = new File(
             [blob],
-            fileName || fileAsset.name || 'document.pdf',
+            desiredName,
             { type: fileAsset.mimeType || blob.type || 'application/octet-stream' }
           );
-
-          console.log('[Upload] File object created:', {
-            name: file.name,
-            size: file.size,
-            type: file.type
-          });
-
-          formData.append('file', file);
-
-          // Verify FormData content
-          console.log('[Upload] FormData created. Checking entries...');
-          for (let pair of formData.entries()) {
-            if (pair[1] instanceof File) {
-              console.log('[Upload] FormData contains File:', pair[0], '=', pair[1].name, pair[1].size, 'bytes');
-            } else {
-              console.log('[Upload] FormData contains:', pair[0], '=', pair[1]);
-            }
-          }
-        } catch (fetchErr) {
-          console.error('[Upload] Failed to fetch blob on web:', fetchErr);
-          formData.append('file', fileAsset.file || fileAsset);
+          formData.append('file', fileToSend);
+        } else {
+          throw new Error('Selected file is missing a web file handle');
         }
       } else {
         // On Native, use the {uri, name, type} object
         const fileToUpload = {
           uri: Platform.OS === 'ios' ? fileAsset.uri.replace('file://', '') : fileAsset.uri,
-          name: fileName || fileAsset.name || 'upload.pdf',
+          name: desiredName || 'upload.pdf',
           type: fileAsset.mimeType || 'application/octet-stream',
         };
         formData.append('file', fileToUpload);

@@ -57,10 +57,12 @@ const getDateOptions = () => {
   return options;
 };
 
-const VendorDeliveryScreen = ({ navigation }) => {
+const VendorDeliveryScreen = ({ navigation, route }) => {
   const { user } = useAuth();
   const vendorId = user?._id;
+  const targetOrderId = route?.params?.orderId;
   const [orders, setOrders] = useState([]);
+  const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -90,24 +92,30 @@ const VendorDeliveryScreen = ({ navigation }) => {
         console.log('[VendorDelivery] All orders:', ordersList.length);
         
         // Show orders that are accepted or in delivery phases
-        // 'accepted' = quotation accepted, awaiting delivery
-        // 'in_progress' = delivery in progress
-        // 'partially_delivered' = partial delivery
-        // 'completed' = fully delivered
         const deliverableOrders = ordersList.filter(order => 
           ['accepted', 'in_progress', 'acknowledged', 'partially_delivered', 'completed'].includes(order.status)
         );
         
         console.log('[VendorDelivery] Deliverable orders:', deliverableOrders.length);
         setOrders(deliverableOrders);
+
+        // Apply filtering if targetOrderId is present
+        if (targetOrderId) {
+          const filtered = deliverableOrders.filter(o => o._id === targetOrderId);
+          setFilteredOrders(filtered.length > 0 ? filtered : deliverableOrders);
+        } else {
+          setFilteredOrders(deliverableOrders);
+        }
       } else {
         console.log('[VendorDelivery] No success response:', response);
         setOrders([]);
+        setFilteredOrders([]);
       }
     } catch (error) {
       console.error('[VendorDelivery] Failed to fetch orders:', error);
       Alert.alert('Error', 'Failed to load orders');
       setOrders([]);
+      setFilteredOrders([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -299,15 +307,31 @@ const VendorDeliveryScreen = ({ navigation }) => {
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={orders}
-          keyExtractor={(item) => item._id}
-          renderItem={renderOrderItem}
-          contentContainerStyle={styles.listContainer}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
-        />
+        <View style={{ flex: 1 }}>
+          {targetOrderId && filteredOrders.length === 1 && orders.length > 1 && (
+            <View style={styles.filterBanner}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="filter" size={16} color="#92400E" />
+                <Text style={styles.filterBannerText}>Showing specific order</Text>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setFilteredOrders(orders)}
+                style={{ backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 }}
+              >
+                <Text style={styles.clearFilterText}>Show All</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          <FlatList
+            data={filteredOrders}
+            keyExtractor={(item) => item._id}
+            renderItem={renderOrderItem}
+            contentContainerStyle={styles.listContainer}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
+          />
+        </View>
       )}
 
       {/* Delivery Update Modal - Inline to prevent re-renders */}
@@ -748,6 +772,26 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#fff',
+  },
+  filterBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FDE68A',
+  },
+  filterBannerText: {
+    fontSize: 13,
+    color: '#92400E',
+    fontWeight: '500',
+  },
+  clearFilterText: {
+    fontSize: 13,
+    color: '#3B82F6',
+    fontWeight: '600',
   },
 });
 

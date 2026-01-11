@@ -130,6 +130,8 @@ const HomeDashboardScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.profileBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={() => navigation.navigate('SettingsScreen')}
+            accessibilityLabel="Open Settings"
           >
             <Feather name="user" size={20} color={COLORS.primary} />
           </TouchableOpacity>

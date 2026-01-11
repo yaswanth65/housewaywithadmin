@@ -92,8 +92,8 @@ const SystemMessageNode = ({ message, systemEvent, onNavigateToDelivery, userRol
   
   const config = getEventConfig();
   
-  // Show delivery tracking button after quotation is accepted
-  const showDeliveryButton = systemEvent === 'quotation_accepted' && onNavigateToDelivery;
+  // Show delivery tracking button after quotation is accepted or invoice generated
+  const showDeliveryButton = (systemEvent === 'quotation_accepted' || systemEvent === 'invoice_generated') && onNavigateToDelivery;
   
   return (
     <View style={styles.container}>

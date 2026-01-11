@@ -97,8 +97,31 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('combined'));
 }
 
-// Static files for uploads
-app.use('/uploads', express.static('uploads'));
+// Static files for uploads - with explicit CORS headers
+app.use('/uploads', (req, res, next) => {
+  // Explicitly set CORS headers for static files
+  const origin = req.get('Origin');
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Vary', 'Origin');
+  } else {
+    res.header('Access-Control-Allow-Origin', '*');
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  // Helmet sets Cross-Origin-Resource-Policy: same-origin by default, which
+  // makes browsers block images/scripts loaded from a different origin (e.g. different port).
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  
+  // Handle OPTIONS preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+}, express.static('uploads'));
+
 app.use('/api/auth', require('./routes/auth'));
 // Socket.io real-time setup
 const server = http.createServer(app);

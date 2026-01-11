@@ -135,6 +135,10 @@ const projectSchema = new mongoose.Schema({
       enum: ['pending', 'paid', 'overdue', 'partial'],
       default: 'pending',
     },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
   }],
   location: {
     address: String,

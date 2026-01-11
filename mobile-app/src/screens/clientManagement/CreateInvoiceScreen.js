@@ -18,20 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import { invoicesAPI, projectsAPI } from '../../utils/api';
 import { useAttendance } from '../../context/AttendanceContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
-
-// Premium White Theme with Gold Accents
-const COLORS = {
-    primary: '#D4AF37',        // Dark Golden Rod
-    primaryLight: 'rgba(184, 134, 11, 0.15)',
-    background: '#FFFFFF',     // Clean White
-    cardBg: '#FFFFFF',         // White cards
-    cardBorder: 'rgba(184, 134, 11, 0.1)',
-    text: '#1A1A1A',           // Dark text
-    textMuted: '#666666',      // Muted text
-    inputBg: '#FFFFFF',        // White input background
-    danger: '#EF4444',
-    success: '#22C55E',
-};
+import { COLORS } from '../../styles/colors';
 
 const CreateInvoiceScreen = ({ navigation, route }) => {
     const { projectId } = route.params || {};
@@ -67,14 +54,14 @@ const CreateInvoiceScreen = ({ navigation, route }) => {
         if (route.params?.amount) {
             setLineItems([
                 {
-                    description: 'Project Payment',
+                    description: route.params.installmentName || 'Project Payment',
                     quantity: '1',
                     unitPrice: String(route.params.amount),
                     category: 'services'
                 }
             ]);
         }
-    }, [route.params?.amount]);
+    }, [route.params?.amount, route.params?.installmentName]);
 
     // UI State
     const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });

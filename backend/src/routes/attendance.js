@@ -30,6 +30,10 @@ router.post('/check-in', authenticate, async (req, res) => {
             // Re-check-in after checkout (resume work)
             attendance.isCheckedIn = true;
             attendance.lastHeartbeat = now;
+            // Resume means session is active again; clear prior checkout time.
+            attendance.checkOutTime = null;
+            // Defensive: ensure checkInTime exists.
+            if (!attendance.checkInTime) attendance.checkInTime = now;
             await attendance.save();
         } else {
             // First check-in of the day
@@ -68,15 +72,25 @@ router.post('/check-in', authenticate, async (req, res) => {
 router.post('/heartbeat', authenticate, async (req, res) => {
     try {
         const userId = req.user._id;
-        const { activeMinutes = 60 } = req.body; // Default to full hour if not specified
+        let { activeMinutes } = req.body;
+        
+        // Validate activeMinutes: must be 0-60
+        if (typeof activeMinutes !== 'number' || activeMinutes < 0 || activeMinutes > 60) {
+            activeMinutes = 60; // Default to full hour
+        }
+        activeMinutes = Math.min(Math.max(0, activeMinutes), 60);
+        
         const now = new Date();
         const today = new Date(now);
         today.setHours(0, 0, 0, 0);
         const currentHour = now.getHours();
 
-        // Find the active session (handles overnight shifts)
-        const attendance = await Attendance.findOne({ user: userId, isCheckedIn: true })
-            .sort({ date: -1 });
+        // Find the active session for TODAY (not just any active session)
+        const attendance = await Attendance.findOne({ 
+            user: userId, 
+            isCheckedIn: true,
+            date: { $gte: today }
+        }).sort({ date: -1 });
 
         if (!attendance) {
             return res.status(400).json({
@@ -89,22 +103,23 @@ router.post('/heartbeat', authenticate, async (req, res) => {
         const existingLog = attendance.hourlyLogs.find(log => log.hour === currentHour);
 
         if (existingLog) {
-            // Update existing log (take higher value)
-            existingLog.activeMinutes = Math.max(existingLog.activeMinutes, Math.min(activeMinutes, 60));
+            // Update existing log - don't allow decreasing values
+            existingLog.activeMinutes = Math.max(existingLog.activeMinutes, activeMinutes);
             existingLog.timestamp = now;
         } else {
             // Add new hourly log
             attendance.hourlyLogs.push({
                 hour: currentHour,
-                activeMinutes: Math.min(activeMinutes, 60),
+                activeMinutes,
                 timestamp: now,
             });
         }
 
-        // Recalculate total
-        attendance.totalActiveMinutes = attendance.hourlyLogs.reduce(
+        // Recalculate total - cap at 24 hours (1440 minutes)
+        const rawTotal = attendance.hourlyLogs.reduce(
             (sum, log) => sum + log.activeMinutes, 0
         );
+        attendance.totalActiveMinutes = Math.min(rawTotal, 1440);
         attendance.lastHeartbeat = now;
 
         await attendance.save();
@@ -114,6 +129,7 @@ router.post('/heartbeat', authenticate, async (req, res) => {
             message: 'Heartbeat recorded',
             data: {
                 hour: currentHour,
+                activeMinutesThisHour: activeMinutes,
                 totalActiveMinutes: attendance.totalActiveMinutes,
                 totalActiveHours: Math.round(attendance.totalActiveMinutes / 60 * 10) / 10,
             },
@@ -140,9 +156,12 @@ router.post('/check-out', authenticate, async (req, res) => {
         const today = new Date(now);
         today.setHours(0, 0, 0, 0);
 
-        // Find the most recent active session for this user (handles overnight shifts)
-        const attendance = await Attendance.findOne({ user: userId, isCheckedIn: true })
-            .sort({ date: -1 });
+        // Find the most recent active session for today
+        const attendance = await Attendance.findOne({ 
+            user: userId, 
+            isCheckedIn: true,
+            date: { $gte: today }
+        }).sort({ date: -1, checkInTime: -1 });
 
         if (!attendance) {
             return res.status(400).json({
@@ -159,9 +178,21 @@ router.post('/check-out', authenticate, async (req, res) => {
             });
         }
 
+        // Verify checkInTime exists before checkout
+        if (!attendance.checkInTime) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid session: no check-in time found',
+            });
+        }
+
         attendance.checkOutTime = now;
         attendance.isCheckedIn = false;
         await attendance.save();
+
+        // Calculate duration
+        const durationMs = attendance.checkOutTime - attendance.checkInTime;
+        const durationMinutes = Math.max(0, Math.round(durationMs / 60000));
 
         res.json({
             success: true,
@@ -171,6 +202,8 @@ router.post('/check-out', authenticate, async (req, res) => {
                 summary: {
                     checkIn: attendance.checkInTime,
                     checkOut: attendance.checkOutTime,
+                    durationMinutes,
+                    sessionHours: Math.round(durationMinutes / 60 * 10) / 10,
                     totalActiveHours: Math.round(attendance.totalActiveMinutes / 60 * 10) / 10,
                 },
             },
@@ -192,7 +225,7 @@ router.post('/check-out', authenticate, async (req, res) => {
  */
 router.get('/', authenticate, async (req, res) => {
     try {
-        const { userId } = req.query;
+        const { userId, date } = req.query;
         
         // Determine which user to fetch
         let targetUserId = userId || req.user._id.toString();
@@ -206,6 +239,33 @@ router.get('/', authenticate, async (req, res) => {
         }
 
         console.log('[Attendance] Fetching for user:', targetUserId, 'Requester role:', req.user.role);
+
+        // If a date is provided, return the record for that day (not “most recent”).
+        if (date) {
+            const d = new Date(date);
+            if (!Number.isNaN(d.getTime())) {
+                d.setHours(0, 0, 0, 0);
+                const nextDay = new Date(d);
+                nextDay.setDate(nextDay.getDate() + 1);
+
+                const dayRecord = await Attendance.findOne({
+                    user: targetUserId,
+                    date: { $gte: d, $lt: nextDay },
+                }).sort({ date: -1, checkInTime: -1 });
+
+                return res.json({
+                    success: true,
+                    data: {
+                        isCheckedIn: dayRecord?.isCheckedIn || false,
+                        checkInTime: dayRecord?.checkInTime || null,
+                        checkOutTime: dayRecord?.checkOutTime || null,
+                        totalActiveMinutes: dayRecord?.totalActiveMinutes || 0,
+                        totalActiveHours: dayRecord ? Math.round(dayRecord.totalActiveMinutes / 60 * 10) / 10 : 0,
+                        lastHeartbeat: dayRecord?.lastHeartbeat || null,
+                    },
+                });
+            }
+        }
 
         // Look for active session first
         let attendance = await Attendance.findOne({ user: targetUserId, isCheckedIn: true });
@@ -240,7 +300,7 @@ router.get('/', authenticate, async (req, res) => {
 
 /**
  * @route   GET /api/attendance/status
- * @desc    Get current check-in status (legacy)
+ * @desc    Get current check-in status
  * @access  Private
  */
 router.get('/status', authenticate, async (req, res) => {
@@ -249,11 +309,19 @@ router.get('/status', authenticate, async (req, res) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Look for active session first, then fallback to most recent record for today/anytime
-        let attendance = await Attendance.findOne({ user: userId, isCheckedIn: true });
+        // Look for active session for TODAY only
+        let attendance = await Attendance.findOne({ 
+            user: userId, 
+            isCheckedIn: true,
+            date: { $gte: today }
+        });
 
         if (!attendance) {
-            attendance = await Attendance.findOne({ user: userId }).sort({ date: -1 });
+            // Get most recent record for today
+            attendance = await Attendance.findOne({ 
+                user: userId,
+                date: { $gte: today }
+            }).sort({ date: -1, checkInTime: -1 });
         }
 
         res.json({

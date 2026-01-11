@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../../context/AuthContext';
 import { projectsAPI, materialRequestsAPI, usersAPI } from '../../utils/api';
 import theme from '../../styles/theme';
@@ -32,6 +33,40 @@ const MATERIAL_CATEGORIES = [
 
 const UNITS = ['pcs', 'kg', 'lbs', 'sqft', 'sqm', 'cubic_ft', 'cubic_m', 'liters', 'gallons', 'meters', 'feet'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+
+const showMessage = (title, message) => {
+    const text = `${title}: ${message}`;
+    if (Platform.OS === 'web') {
+        // RN Web doesn't reliably implement Alert.alert
+        // eslint-disable-next-line no-alert
+        alert(text);
+        return;
+    }
+    Alert.alert(title, message);
+};
+
+const formatYYYYMMDD = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const parseYYYYMMDDToISO = (value) => {
+    const trimmed = String(value || '').trim();
+    const match = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(trimmed);
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    const utcDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+    if (Number.isNaN(utcDate.getTime())) return null;
+    // Ensure input didn't overflow (e.g. 2026-02-31)
+    if (utcDate.getUTCFullYear() !== year || utcDate.getUTCMonth() !== month - 1 || utcDate.getUTCDate() !== day) return null;
+    return utcDate.toISOString();
+};
 
 const VendorTeamProjectDetailScreen = ({ navigation, route }) => {
     const { projectId } = route.params;
@@ -58,6 +93,7 @@ const VendorTeamProjectDetailScreen = ({ navigation, route }) => {
     const [successMessage, setSuccessMessage] = useState('');
     const [expandedVendor, setExpandedVendor] = useState(null);
     const [expandedRequest, setExpandedRequest] = useState(null);
+    const [showRequiredByPicker, setShowRequiredByPicker] = useState(false);
 
     const tabs = ['Overview', 'Vendors', 'Material Requests'];
 
@@ -94,13 +130,13 @@ const VendorTeamProjectDetailScreen = ({ navigation, route }) => {
 
     const loadVendors = async () => {
         try {
-            // Fetch vendorTeam employees (role: employee, subRole: vendorTeam)
-            const response = await usersAPI.getUsers({ role: 'employee', subRole: 'vendorTeam' });
-            if (response.data?.users) {
+            // Fetch actual vendors (role: vendor)
+            const response = await usersAPI.getUsers({ role: 'vendor', limit: 200 });
+            if (response.success && response.data?.users) {
                 setVendors(response.data.users);
             }
         } catch (error) {
-            console.error('Error loading vendor team employees:', error);
+            console.error('Error loading vendors:', error);
         }
     };
 
@@ -143,47 +179,77 @@ const VendorTeamProjectDetailScreen = ({ navigation, route }) => {
         }
     };
 
+    const onRequiredByChange = (_event, selectedDate) => {
+        // Android fires with undefined when dismissed
+        setShowRequiredByPicker(Platform.OS === 'ios');
+        if (!selectedDate) return;
+        setRequestForm(prev => ({ ...prev, requiredBy: formatYYYYMMDD(selectedDate) }));
+    };
+
     const submitMaterialRequest = async () => {
         const { title, materials, priority, requiredBy, selectedVendor } = requestForm;
 
         if (!title.trim()) {
-            Alert.alert('Error', 'Please enter a title');
+            showMessage('Error', 'Please enter a title');
             return;
         }
 
-        if (!materials[0].name.trim() || !materials[0].quantity) {
-            Alert.alert('Error', 'Please add at least one material with name and quantity');
+        const validMaterials = (materials || [])
+            .map((m) => ({
+                name: String(m?.name || '').trim(),
+                quantityRaw: String(m?.quantity || '').trim(),
+                unit: m?.unit || 'pcs',
+                category: m?.category || 'other',
+            }))
+            .filter((m) => m.name.length > 0 || m.quantityRaw.length > 0);
+
+        if (validMaterials.length === 0) {
+            showMessage('Error', 'Please add at least one material');
             return;
         }
 
-        if (!requiredBy) {
-            Alert.alert('Error', 'Please select a required by date');
+        const hasInvalidMaterial = validMaterials.some((m) => {
+            const qty = Number(m.quantityRaw);
+            return !m.name || !Number.isFinite(qty) || qty <= 0;
+        });
+
+        if (hasInvalidMaterial) {
+            showMessage('Error', 'Each material must have a name and quantity > 0');
+            return;
+        }
+
+        const requiredByISO = parseYYYYMMDDToISO(requiredBy);
+        if (!requiredByISO) {
+            showMessage('Error', 'Required by date must be in YYYY-MM-DD format');
             return;
         }
 
         try {
             setSubmitting(true);
 
-            // Format materials for API
-            const formattedMaterials = materials
-                .filter(m => m.name.trim() && m.quantity)
-                .map(m => ({
-                    ...m,
-                    quantity: parseFloat(m.quantity),
-                    requiredBy: new Date(requiredBy).toISOString(),
-                }));
+            const formattedMaterials = validMaterials.map((m) => ({
+                name: m.name,
+                quantity: Number(m.quantityRaw),
+                unit: m.unit,
+                category: m.category,
+                requiredBy: requiredByISO,
+            }));
 
             const requestData = {
                 projectId: projectId,
                 title: title.trim(),
                 description: requestForm.description.trim(),
                 priority,
-                requiredBy: new Date(requiredBy).toISOString(),
+                requiredBy: requiredByISO,
                 materials: formattedMaterials,
                 assignedVendors: selectedVendor ? [{ vendor: selectedVendor }] : [],
             };
 
+            console.log('[VendorTeam] Submitting material request', requestData);
+
             const response = await materialRequestsAPI.createMaterialRequest(requestData);
+
+            console.log('[VendorTeam] Material request API response', response);
 
             if (response.success) {
                 setShowRequestModal(false);
@@ -203,9 +269,7 @@ const VendorTeamProjectDetailScreen = ({ navigation, route }) => {
             }
         } catch (error) {
             console.error('Error creating material request:', error);
-            Platform.OS === 'web'
-                ? alert('Failed to create request: ' + error.message)
-                : Alert.alert('Error', 'Failed to create request: ' + error.message);
+            showMessage('Error', 'Failed to create request: ' + (error?.message || 'Unknown error'));
         } finally {
             setSubmitting(false);
         }
@@ -382,14 +446,21 @@ const VendorTeamProjectDetailScreen = ({ navigation, route }) => {
         </View>
     );
 
-    // Vendors Tab - Show available vendor team employees with inline details
+    // Vendors Tab
     const VendorsTab = () => (
         <View style={styles.tabContent}>
             <View style={styles.card}>
-                <Text style={styles.cardTitle}>Available Vendor Team</Text>
-                {vendors && vendors.length > 0 ? (
-                    vendors.map((vendor, index) => (
-                        <View key={vendor._id || index}>
+                <Text style={styles.cardTitle}>Available Vendors</Text>
+                {vendors.length > 0 ? (
+                    vendors.map((vendor) => (
+                        <View
+                            key={vendor._id}
+                            style={{
+                                borderBottomWidth: 1,
+                                borderBottomColor: theme.colors.primary[100],
+                                paddingVertical: 12,
+                            }}
+                        >
                             <TouchableOpacity
                                 style={styles.vendorItem}
                                 onPress={() => setExpandedVendor(expandedVendor === vendor._id ? null : vendor._id)}
@@ -397,30 +468,31 @@ const VendorTeamProjectDetailScreen = ({ navigation, route }) => {
                                 <View style={styles.avatar}>
                                     <Feather name="user" size={20} color={theme.colors.primary[600]} />
                                 </View>
-                                <View style={styles.memberInfo}>
+                                <View style={{ flex: 1, marginLeft: 12 }}>
                                     <Text style={styles.memberName}>
-                                        {vendor.firstName} {vendor.lastName}
+                                        {vendor.vendorDetails?.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || 'Vendor'}
                                     </Text>
-                                    <Text style={styles.memberRole}>Vendor Team Employee</Text>
+                                    <Text style={styles.memberRole}>{vendor.email || 'No email'}</Text>
                                 </View>
                                 <Feather
-                                    name={expandedVendor === vendor._id ? "chevron-up" : "chevron-down"}
+                                    name={expandedVendor === vendor._id ? 'chevron-up' : 'chevron-down'}
                                     size={20}
                                     color={theme.colors.text.secondary}
                                 />
                             </TouchableOpacity>
-                            {/* Expanded Details */}
+
                             {expandedVendor === vendor._id && (
-                                <View style={{
-                                    backgroundColor: theme.colors.primary[100],
-                                    padding: 12,
-                                    marginLeft: 48,
-                                    marginBottom: 8,
-                                    borderRadius: 8,
-                                }}>
+                                <View
+                                    style={{
+                                        backgroundColor: theme.colors.primary[50],
+                                        padding: 12,
+                                        borderRadius: 8,
+                                        marginTop: 8,
+                                    }}
+                                >
                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
                                         <Feather name="mail" size={14} color={theme.colors.primary[600]} />
-                                        <Text style={{ marginLeft: 8, color: theme.colors.text.primary }}>{vendor.email}</Text>
+                                        <Text style={{ marginLeft: 8, color: theme.colors.text.primary }}>{vendor.email || 'No email'}</Text>
                                     </View>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
                                         <Feather name="phone" size={14} color={theme.colors.primary[600]} />
@@ -428,14 +500,16 @@ const VendorTeamProjectDetailScreen = ({ navigation, route }) => {
                                     </View>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                         <Feather name="briefcase" size={14} color={theme.colors.primary[600]} />
-                                        <Text style={{ marginLeft: 8, color: theme.colors.text.primary }}>Vendor Team</Text>
+                                        <Text style={{ marginLeft: 8, color: theme.colors.text.primary }}>
+                                            {vendor.vendorDetails?.specialization || 'Vendor'}
+                                        </Text>
                                     </View>
                                 </View>
                             )}
                         </View>
                     ))
                 ) : (
-                    <Text style={styles.emptyText}>No vendor team employees available</Text>
+                    <Text style={styles.emptyText}>No vendors available</Text>
                 )}
             </View>
         </View>
@@ -544,7 +618,7 @@ const VendorTeamProjectDetailScreen = ({ navigation, route }) => {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
             >
                 {/* Header */}
-                <LinearGradient colors={['#D4AF37', '#DAA520']} style={styles.header}>
+                <LinearGradient colors={[theme.colors.primary[500], theme.colors.primary[700]]} style={styles.header}>
                     <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
                         <Feather name="arrow-left" size={24} color="#FFFFFF" />
                     </TouchableOpacity>
@@ -570,7 +644,7 @@ const VendorTeamProjectDetailScreen = ({ navigation, route }) => {
                 {/* Success Message Toast */}
                 {successMessage ? (
                     <View style={{
-                        backgroundColor: '#388E3C',
+                        backgroundColor: theme.colors.success[600],
                         padding: 12,
                         marginHorizontal: 16,
                         marginTop: 8,
@@ -578,8 +652,8 @@ const VendorTeamProjectDetailScreen = ({ navigation, route }) => {
                         flexDirection: 'row',
                         alignItems: 'center',
                     }}>
-                        <Feather name="check-circle" size={20} color="#FFFFFF" />
-                        <Text style={{ color: '#FFFFFF', marginLeft: 8, fontWeight: '600' }}>{successMessage}</Text>
+                        <Feather name="check-circle" size={20} color={theme.colors.text.white} />
+                        <Text style={{ color: theme.colors.text.white, marginLeft: 8, fontWeight: '600' }}>{successMessage}</Text>
                     </View>
                 ) : null}
 
@@ -631,12 +705,36 @@ const VendorTeamProjectDetailScreen = ({ navigation, route }) => {
                             </View>
 
                             <Text style={styles.inputLabel}>Required By Date *</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={requestForm.requiredBy}
-                                onChangeText={(text) => setRequestForm(prev => ({ ...prev, requiredBy: text }))}
-                                placeholder="YYYY-MM-DD"
-                            />
+                            {Platform.OS === 'web' ? (
+                                <TextInput
+                                    style={styles.input}
+                                    value={requestForm.requiredBy}
+                                    onChangeText={(text) => setRequestForm(prev => ({ ...prev, requiredBy: text }))}
+                                    placeholder="YYYY-MM-DD"
+                                />
+                            ) : (
+                                <TouchableOpacity activeOpacity={0.8} onPress={() => setShowRequiredByPicker(true)}>
+                                    <View pointerEvents="none">
+                                        <TextInput
+                                            style={styles.input}
+                                            value={requestForm.requiredBy}
+                                            placeholder="Select date"
+                                            editable={false}
+                                        />
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+                            <Text style={styles.inputHint}>Example: 2026-01-03</Text>
+
+                            {showRequiredByPicker ? (
+                                <DateTimePicker
+                                    value={requestForm.requiredBy ? new Date(parseYYYYMMDDToISO(requestForm.requiredBy) || Date.now()) : new Date(Date.now() + 24 * 60 * 60 * 1000)}
+                                    mode="date"
+                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                    minimumDate={new Date(Date.now() + 24 * 60 * 60 * 1000)}
+                                    onChange={onRequiredByChange}
+                                />
+                            ) : null}
 
                             <Text style={styles.inputLabel}>Select Vendor</Text>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vendorScroll}>
@@ -647,11 +745,19 @@ const VendorTeamProjectDetailScreen = ({ navigation, route }) => {
                                         onPress={() => setRequestForm(prev => ({ ...prev, selectedVendor: v._id }))}
                                     >
                                         <Text style={[styles.vendorChipText, requestForm.selectedVendor === v._id && styles.vendorChipTextActive]}>
-                                            {v.vendorDetails?.companyName || v.firstName}
+                                            {v.vendorDetails?.companyName || `${v.firstName || ''} ${v.lastName || ''}`.trim() || 'Vendor'}
                                         </Text>
                                     </TouchableOpacity>
                                 ))}
                             </ScrollView>
+                            {requestForm.selectedVendor ? (
+                                <TouchableOpacity
+                                    style={{ alignSelf: 'flex-start', marginTop: 8 }}
+                                    onPress={() => setRequestForm(prev => ({ ...prev, selectedVendor: null }))}
+                                >
+                                    <Text style={{ color: theme.colors.text.secondary }}>Clear vendor selection</Text>
+                                </TouchableOpacity>
+                            ) : null}
 
                             <Text style={styles.inputLabel}>Materials *</Text>
                             {requestForm.materials.map((material, index) => (
@@ -811,6 +917,12 @@ const styles = StyleSheet.create({
     requestMeta: { fontSize: 13, color: theme.colors.text.secondary, marginTop: 8 },
     requestDate: { fontSize: 12, color: theme.colors.text.secondary, marginTop: 4 },
     emptyState: { alignItems: 'center', padding: 40 },
+    inputHint: {
+        fontSize: 12,
+        color: theme.colors.text.muted,
+        marginTop: -6,
+        marginBottom: 12,
+    },
     modalOverlay: {
         flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'flex-end',

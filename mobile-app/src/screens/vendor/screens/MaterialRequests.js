@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, ScrollView, Text, Alert, TouchableOpacity, StyleSheet, Platform, Modal } from 'react-native';
+import { View, ScrollView, Text, Alert, TouchableOpacity, StyleSheet, Platform, Modal, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import io from 'socket.io-client';
 import AppHeader from '../components/AppHeader';
@@ -8,16 +8,35 @@ import theme from '../../../styles/theme';
 import { materialRequestsAPI, quotationsAPI } from '../../../utils/api';
 import { getSocketBaseUrl } from '../../../utils/network';
 
-export default function MaterialRequests({ navigation }) {
-  const [availableRequests, setAvailableRequests] = useState([]);
+export default function MaterialRequests({ navigation, route }) {
   const [myRequests, setMyRequests] = useState([]);
   const [approvedQuotations, setApprovedQuotations] = useState([]);
-  const [activeTab, setActiveTab] = useState('available'); // 'available', 'accepted', or 'approved'
+  const [activeTab, setActiveTab] = useState(() => {
+    const requestedTab = route?.params?.initialTab;
+    return requestedTab === 'accepted' || requestedTab === 'approved'
+      ? requestedTab
+      : 'accepted';
+  }); // 'accepted' or 'approved'
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
   const [detailsModal, setDetailsModal] = useState({ visible: false, request: null });
   const [socketConnected, setSocketConnected] = useState(false);
   const [quotations, setQuotations] = useState({}); // Store quotations by materialRequestId
   const socketRef = useRef(null);
+
+  const showAlert = (title, message) => {
+    if (Platform.OS === 'web') {
+      window.alert(`${title}: ${message}`);
+      return;
+    }
+    Alert.alert(title, message);
+  };
+
+  useEffect(() => {
+    const requestedTab = route?.params?.initialTab;
+    if (requestedTab !== 'accepted' && requestedTab !== 'approved') return;
+    if (requestedTab !== activeTab) setActiveTab(requestedTab);
+  }, [route?.params?.initialTab]);
 
   // Initialize socket connection
   useEffect(() => {
@@ -98,18 +117,10 @@ export default function MaterialRequests({ navigation }) {
   const loadData = async () => {
     try {
       setLoading(true);
+      setErrorMessage('');
       console.log(`[MaterialRequests] Loading ${activeTab} requests...`);
       
-      if (activeTab === 'available') {
-        // Load available (unassigned) requests
-        const res = await materialRequestsAPI.getAvailableRequests({ limit: 100 });
-        console.log('[MaterialRequests] Available requests response:', res);
-        
-        if (res.success) {
-          setAvailableRequests(res.data.materialRequests || []);
-          console.log('[MaterialRequests] Found', res.data.materialRequests?.length || 0, 'available requests');
-        }
-      } else if (activeTab === 'approved') {
+      if (activeTab === 'approved') {
         // Load approved quotations
         const res = await quotationsAPI.getQuotations({ status: 'approved' });
         console.log('[MaterialRequests] Approved quotations response:', res);
@@ -119,8 +130,8 @@ export default function MaterialRequests({ navigation }) {
           console.log('[MaterialRequests] Found', res.data.quotations?.length || 0, 'approved quotations');
         }
       } else {
-        // Load my accepted requests (excluding approved ones)
-        const res = await materialRequestsAPI.getMaterialRequests({ limit: 100, status: 'pending' });
+        // Load requests assigned to me (all statuses)
+        const res = await materialRequestsAPI.getMaterialRequests({ limit: 100, status: 'all' });
         console.log('[MaterialRequests] My requests response:', res);
         
         if (res.success) {
@@ -134,7 +145,8 @@ export default function MaterialRequests({ navigation }) {
       }
     } catch (error) {
       console.error('[MaterialRequests] Error loading:', error);
-      Alert.alert('Error', 'Failed to load material requests');
+      setErrorMessage(error?.message || 'Failed to load material requests');
+      showAlert('Error', error?.message || 'Failed to load material requests');
     } finally {
       setLoading(false);
     }
@@ -197,39 +209,103 @@ export default function MaterialRequests({ navigation }) {
     try {
       console.log('[MaterialRequests] Accepting request:', request._id);
       const res = await materialRequestsAPI.acceptMaterialRequest(request._id);
+
+      const purchaseOrderId = res?.data?.purchaseOrder?._id;
       
       if (res.success) {
         // Show success message
+        const successMessage = purchaseOrderId
+          ? 'Material request accepted. Order created for negotiation.'
+          : 'Material request accepted.';
+
         if (Platform.OS === 'web') {
-          window.alert('Material request accepted. You can now create a quotation.');
-          loadData(); // Reload data
-          setActiveTab('accepted'); // Switch to accepted tab
+          window.alert(successMessage);
+          loadData();
+          setActiveTab('accepted');
+          if (purchaseOrderId) {
+            navigation.navigate('NegotiationChat', {
+              orderId: purchaseOrderId,
+              userRole: 'vendor',
+            });
+          }
         } else {
           Alert.alert(
             'Success!',
-            'Material request accepted. You can now create a quotation.',
+            successMessage,
             [
               { text: 'OK', onPress: () => {
-                loadData(); // Reload data
-                setActiveTab('accepted'); // Switch to accepted tab
+                loadData();
+                setActiveTab('accepted');
+                if (purchaseOrderId) {
+                  navigation.navigate('NegotiationChat', {
+                    orderId: purchaseOrderId,
+                    userRole: 'vendor',
+                  });
+                }
               }}
             ]
           );
         }
       } else {
+        const existingPurchaseOrderId = res?.data?.purchaseOrder?._id;
         if (Platform.OS === 'web') {
           window.alert(res.message || 'Failed to accept request');
+          if (existingPurchaseOrderId) {
+            navigation.navigate('NegotiationChat', {
+              orderId: existingPurchaseOrderId,
+              userRole: 'vendor',
+            });
+          }
         } else {
-          Alert.alert('Error', res.message || 'Failed to accept request');
+          Alert.alert(
+            'Error',
+            res.message || 'Failed to accept request',
+            existingPurchaseOrderId
+              ? [
+                  {
+                    text: 'Open Chat',
+                    onPress: () =>
+                      navigation.navigate('NegotiationChat', {
+                        orderId: existingPurchaseOrderId,
+                        userRole: 'vendor',
+                      }),
+                  },
+                  { text: 'OK' },
+                ]
+              : [{ text: 'OK' }]
+          );
         }
       }
     } catch (error) {
       console.error('[MaterialRequests] Error accepting:', error);
-      const errorMsg = error.response?.data?.message || 'Failed to accept material request';
+      const errorMsg = error?.message || 'Failed to accept material request';
+      const existingPurchaseOrderId = error?.data?.purchaseOrder?._id;
       if (Platform.OS === 'web') {
         window.alert(errorMsg);
+        if (existingPurchaseOrderId) {
+          navigation.navigate('NegotiationChat', {
+            orderId: existingPurchaseOrderId,
+            userRole: 'vendor',
+          });
+        }
       } else {
-        Alert.alert('Error', errorMsg);
+        Alert.alert(
+          'Error',
+          errorMsg,
+          existingPurchaseOrderId
+            ? [
+                {
+                  text: 'Open Chat',
+                  onPress: () =>
+                    navigation.navigate('NegotiationChat', {
+                      orderId: existingPurchaseOrderId,
+                      userRole: 'vendor',
+                    }),
+                },
+                { text: 'OK' },
+              ]
+            : [{ text: 'OK' }]
+        );
       }
     }
   };
@@ -340,7 +416,7 @@ Status: ${request.status || 'pending'}`;
     }
   };
 
-  const requests = activeTab === 'available' ? availableRequests : (activeTab === 'approved' ? [] : myRequests);
+  const requests = activeTab === 'approved' ? [] : myRequests;
 
   if (loading) {
     return (
@@ -441,15 +517,11 @@ Status: ${request.status || 'pending'}`;
                   style={styles.modalButtonPrimary}
                   onPress={() => {
                     setDetailsModal({ visible: false, request: null });
-                    if (activeTab === 'available') {
-                      acceptRequest(detailsModal.request);
-                    } else {
-                      createQuotation(detailsModal.request);
-                    }
+                    createQuotation(detailsModal.request);
                   }}
                 >
                   <Text style={styles.modalButtonPrimaryText}>
-                    {activeTab === 'available' ? 'Accept Request' : 'Create Quotation'}
+                    Create Quotation
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -461,19 +533,11 @@ Status: ${request.status || 'pending'}`;
       {/* Tabs */}
       <View style={styles.tabContainer}>
         <TouchableOpacity 
-          style={[styles.tab, activeTab === 'available' && styles.activeTab]}
-          onPress={() => setActiveTab('available')}
-        >
-          <Text style={[styles.tabText, activeTab === 'available' && styles.activeTabText]}>
-            Available ({availableRequests.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
           style={[styles.tab, activeTab === 'accepted' && styles.activeTab]}
           onPress={() => setActiveTab('accepted')}
         >
           <Text style={[styles.tabText, activeTab === 'accepted' && styles.activeTabText]}>
-            Accepted ({myRequests.length})
+            Assigned ({myRequests.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity 
@@ -543,11 +607,15 @@ Status: ${request.status || 'pending'}`;
             </View>
           ))
         ) : (
-          // Material Requests Section (Available/Accepted)
+          // Material Requests Section (Assigned/Accepted)
           requests.map(r => {
             const quotation = quotations[r._id];
             const quotationStatus = quotation ? quotation.status : null;
             const isApproved = quotationStatus === 'approved';
+            const canStartOrder =
+              activeTab === 'accepted' &&
+              (r.status === 'pending' || r.status === 'approved') &&
+              !quotationStatus;
             
             return (
               <MaterialCard 
@@ -555,8 +623,8 @@ Status: ${request.status || 'pending'}`;
                 item={r} 
                 index={requests.indexOf(r)} // Pass index for staggered animation
                 onAccept={
-                  activeTab === 'available' 
-                    ? () => acceptRequest(r) 
+                  canStartOrder
+                    ? () => acceptRequest(r)
                     : isApproved 
                     ? () => viewQuotationDetails(r, quotation) 
                     : () => createQuotation(r)
@@ -566,8 +634,8 @@ Status: ${request.status || 'pending'}`;
                 onChat={quotationStatus && !isApproved ? () => openNegotiationChat(r) : null}
                 showAcceptButton={true}
                 acceptButtonText={
-                  activeTab === 'available' 
-                    ? 'Accept' 
+                  canStartOrder
+                    ? 'Accept & Create Order'
                     : isApproved 
                     ? 'View Quote' 
                     : quotationStatus 
@@ -583,6 +651,7 @@ Status: ${request.status || 'pending'}`;
           <View style={styles.emptyContainer}>
             <Feather name="inbox" size={64} color={theme.colors.text.muted} />
             <Text style={styles.emptyText}>
+              {errorMessage ? `${errorMessage}\n\n` : ''}
               {activeTab === 'available' 
                 ? 'No available material requests'
                 : activeTab === 'approved'

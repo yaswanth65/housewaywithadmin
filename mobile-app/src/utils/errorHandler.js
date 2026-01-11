@@ -223,7 +223,7 @@ export const useErrorHandler = () => {
 // Network status checker
 export const NetworkUtils = {
   isNetworkError: (error) => {
-    return !error.response && error.request;
+    return !!(!error.response && error.request);
   },
 
   isServerError: (error) => {

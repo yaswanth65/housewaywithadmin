@@ -54,10 +54,11 @@ const OwnerDashboardScreen = ({ navigation }) => {
       const results = await Promise.allSettled([
         api.getReceivables(),
         api.getPayables(),
-        api.getProjects(),
+        // Backend defaults to `limit=10` for lists; dashboard needs full-ish datasets.
+        api.getProjects({ limit: 1000 }),
         api.getUsers('client'),
         ordersAPI.getOrders(),
-        api.getMaterialRequests(),
+        api.getMaterialRequests({ limit: 1000 }),
         api.getTeamStats(),
         api.getRecentActivity()
       ]);
@@ -126,9 +127,19 @@ const OwnerDashboardScreen = ({ navigation }) => {
       
       // Calculate project health stats
       const safeProjects = Array.isArray(projData) ? projData : [];
-      const onTrack = safeProjects.filter(p => p.status === 'in-progress').length;
-      const atRisk = safeProjects.filter(p => p.priority === 'high').length;
-      const delayed = safeProjects.filter(p => p.status === 'planning').length;
+      const now = new Date();
+      const isActiveProject = (p) => p && !['completed', 'cancelled'].includes(p.status);
+      const isDelayed = (p) => {
+        const expectedEnd = p?.timeline?.expectedEndDate;
+        if (!expectedEnd) return false;
+        const expectedEndDate = new Date(expectedEnd);
+        return isActiveProject(p) && !Number.isNaN(expectedEndDate.getTime()) && expectedEndDate < now;
+      };
+      const isAtRisk = (p) => isActiveProject(p) && ['high', 'urgent'].includes(p.priority);
+
+      const delayed = safeProjects.filter(isDelayed).length;
+      const atRisk = safeProjects.filter(isAtRisk).length;
+      const onTrack = safeProjects.filter(p => isActiveProject(p) && !isDelayed(p) && !isAtRisk(p)).length;
       setStats({ onTrack, atRisk, delayed });
       
       console.log('[Dashboard] ✅ Data fetch completed successfully');
@@ -184,7 +195,7 @@ const OwnerDashboardScreen = ({ navigation }) => {
         setAddUserVisible(false);
         onRefresh();
       } catch (e) {
-        Alert.alert("Error", "Failed to create user");
+        Alert.alert("Error", e?.message || "Failed to create user");
       }
     };
 
@@ -587,14 +598,30 @@ const OwnerDashboardScreen = ({ navigation }) => {
         clientName: p.vendorName || 'Unknown Vendor', // Use vendor name for payables
         projectName: p.projectName || 'Vendor Payment'
       }))
-    ];
+    ].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     
-    const filtered = paymentTab === 'all' 
-      ? allPayments 
-      : allPayments.filter(r => r.status === paymentTab || 
-          (paymentTab === 'pending' && ['pending', 'sent', 'viewed'].includes(r.status)));
+    const today = new Date();
+    const nextWeek = new Date();
+    nextWeek.setDate(today.getDate() + 7);
+
+    const filtered = allPayments.filter(item => {
+      if (paymentTab === 'all') return true;
+      
+      const dueDate = new Date(item.dueDate);
+      
+      if (paymentTab === 'overdue') {
+        return item.status === 'overdue' || (item.status === 'pending' && dueDate < today);
+      }
+      
+      if (paymentTab === 'pending') {
+        // "Due Soon" - Pending and due within next 7 days or already overdue but not marked yet
+        return (item.status === 'pending' || item.status === 'sent') && dueDate <= nextWeek;
+      }
+      
+      return item.status === paymentTab;
+    });
     
-    const displayItems = filtered.slice(0, 3);
+    const displayItems = filtered.slice(0, 5); // Show more items on dashboard
 
     return (
       <View style={styles.sectionContainer}>
@@ -626,52 +653,73 @@ const OwnerDashboardScreen = ({ navigation }) => {
         <View style={styles.cardContainer}>
           {loading ? (
             <ActivityIndicator color="#333" />
-          ) : displayItems.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <Text style={styles.emptyText}>No {paymentTab} payments</Text>
           ) : (
-            displayItems.map((item) => (
-              <View 
-                key={item._id} 
-                style={[
-                  styles.paymentCard, 
-                  item.status === 'overdue' 
-                    ? { borderLeftColor: '#D32F2F' } 
-                    : { borderLeftColor: '#FBC02D' }
-                ]}
-              >
-                <View style={styles.payHeader}>
-                  <Text style={styles.payProject}>
-                    {item.paymentType === 'receivable' ? '📥' : '📤'} {item.projectName}
+            displayItems.map((item) => {
+              const isOverdue = item.status === 'overdue' || (item.status === 'pending' && new Date(item.dueDate) < today);
+              
+              return (
+                <View 
+                  key={item._id} 
+                  style={[
+                    styles.paymentCard, 
+                    isOverdue 
+                      ? { borderLeftColor: '#D32F2F' } 
+                      : { borderLeftColor: '#FBC02D' }
+                  ]}
+                >
+                  <View style={styles.payHeader}>
+                    <Text style={styles.payProject} numberOfLines={1}>
+                      {item.paymentType === 'receivable' ? '📥' : '📤'} {item.projectName}
+                    </Text>
+                    {isOverdue ? (
+                      <View style={styles.badgeLate}>
+                        <Text style={styles.badgeLateText}>🔴 OVERDUE</Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.badgeLate, { backgroundColor: '#FFF8E1' }]}>
+                        <Text style={[styles.badgeLateText, { color: '#FBC02D' }]}>🟡 PENDING</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.payClient}>
+                    {item.paymentType === 'receivable' ? 'From:' : 'To:'} {item.clientName}
                   </Text>
-                  {item.status === 'overdue' && (
-                    <View style={styles.badgeLate}>
-                      <Text style={styles.badgeLateText}>🔴 OVERDUE</Text>
-                    </View>
-                  )}
-                  {['pending', 'sent', 'viewed'].includes(item.status) && (
-                    <View style={[styles.badgeLate, { backgroundColor: '#FFF8E1' }]}>
-                      <Text style={[styles.badgeLateText, { color: '#FBC02D' }]}>🟡 DUE SOON</Text>
-                    </View>
-                  )}
+                  <View style={styles.payRow}>
+                    <Text style={styles.payLabel}>Due: {new Date(item.dueDate).toLocaleDateString()}</Text>
+                    <Text style={styles.payAmount}>₹{item.amount.toLocaleString()}</Text>
+                  </View>
+                  <View style={styles.payActions}>
+                    <TouchableOpacity 
+                      style={styles.btnAction}
+                      onPress={() => navigation.navigate('ProjectPayments', { projectId: item.projectId?._id || item.projectId })}
+                    >
+                      <Ionicons name="calendar" size={14} color="#333" />
+                      <Text style={styles.btnActionText}>Schedule</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.btnActionSecondary}
+                      onPress={() => {
+                        if (item.isSchedule) {
+                          navigation.navigate('CreateInvoice', { 
+                            projectId: item.projectId?._id || item.projectId,
+                            amount: item.amount,
+                            installmentName: item.installmentName
+                          });
+                        } else {
+                          // View existing invoice
+                        }
+                      }}
+                    >
+                      <Text style={styles.btnActionText}>
+                        {item.isSchedule ? '📄 Invoice' : '👁️ View'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <Text style={styles.payClient}>
-                  {item.paymentType === 'receivable' ? 'From:' : 'To:'} {item.clientName}
-                </Text>
-                <View style={styles.payRow}>
-                  <Text style={styles.payLabel}>Due: {new Date(item.dueDate).toLocaleDateString()}</Text>
-                  <Text style={styles.payAmount}>₹{item.amount.toLocaleString()}</Text>
-                </View>
-                <View style={styles.payActions}>
-                  <TouchableOpacity style={styles.btnAction}>
-                    <Ionicons name="call" size={14} color="#333" />
-                    <Text style={styles.btnActionText}>Follow Up</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.btnActionSecondary}>
-                    <Text style={styles.btnActionText}>✏️ Edit</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
+              );
+            })
           )}
 
           <TouchableOpacity 
@@ -986,10 +1034,27 @@ const OwnerDashboardScreen = ({ navigation }) => {
 
       <Text style={[styles.subsectionTitle, { marginTop: 16 }]}>Team Utilization:</Text>
       <View style={styles.barBg}>
-        <View style={[styles.barFill, { width: `${teamStats.utilizationRate || 75}%`, backgroundColor: '#1976D2' }]} />
+        {(() => {
+          const totalEmployees = Number(teamStats.totalEmployees) || 0;
+          const assignedEmployeeIds = new Set(
+            (projects || []).flatMap(p => (p?.assignedEmployees || []).map(e => (typeof e === 'string' ? e : e?._id))).filter(Boolean)
+          );
+          const assignedCount = assignedEmployeeIds.size;
+          const utilizationRate = totalEmployees > 0 ? Math.round((assignedCount / totalEmployees) * 100) : 0;
+          return (
+            <View style={[styles.barFill, { width: `${utilizationRate}%`, backgroundColor: '#1976D2' }]} />
+          );
+        })()}
       </View>
       <Text style={styles.utilizationText}>
-        {teamStats.activeEmployees || 9} of {teamStats.totalEmployees || 12} members assigned
+        {(() => {
+          const totalEmployees = Number(teamStats.totalEmployees) || 0;
+          const assignedEmployeeIds = new Set(
+            (projects || []).flatMap(p => (p?.assignedEmployees || []).map(e => (typeof e === 'string' ? e : e?._id))).filter(Boolean)
+          );
+          const assignedCount = assignedEmployeeIds.size;
+          return `${assignedCount} of ${totalEmployees} members assigned`;
+        })()}
       </Text>
 
       <View style={styles.teamActionRow}>

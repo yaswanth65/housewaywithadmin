@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     submitButtonText: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1F2937', // Dark text on yellow button
+        color: '#FFFFFF', // White text on gold button
     },
     helpText: {
         fontSize: 12,

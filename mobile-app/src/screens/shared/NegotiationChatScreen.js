@@ -38,7 +38,6 @@ import InvoiceNode from '../../components/chat/InvoiceNode';
 import SystemMessageNode from '../../components/chat/SystemMessageNode';
 import TextMessageNode from '../../components/chat/TextMessageNode';
 import QuotationInputModal from '../../components/chat/QuotationInputModal';
-import DeliveryFormNode from '../../components/chat/DeliveryFormNode';
 import DeliveryStatusNode from '../../components/chat/DeliveryStatusNode';
 
 // Import API and Context
@@ -72,7 +71,6 @@ const NegotiationChatScreen = ({ route, navigation }) => {
   const [isRejecting, setIsRejecting] = useState(false);
   const [acceptingId, setAcceptingId] = useState(null);
   const [isOtherTyping, setIsOtherTyping] = useState(false);
-  const [isSubmittingDelivery, setIsSubmittingDelivery] = useState(false);
   const typingTimeoutRef = useRef(null);
   
   // Refs
@@ -498,49 +496,6 @@ Status: ${invoice.status.toUpperCase()}
       Alert.alert('Error', 'Failed to download invoice');
     }
   };
-  
-  // Submit delivery details (Vendor only)
-  const handleSubmitDelivery = async (deliveryData) => {
-    if (userRole !== 'vendor') {
-      Alert.alert('Error', 'Only vendors can submit delivery details');
-      return;
-    }
-    
-    setIsSubmittingDelivery(true);
-    
-    try {
-      const response = await ordersAPI.updateDeliveryStatus(orderId, {
-        status: deliveryData.status || 'preparing',
-        expectedDeliveryDate: deliveryData.expectedDeliveryDate,
-        notes: deliveryData.notes,
-      });
-      
-      if (response.success) {
-        // Update local order state
-        setOrder(prev => ({
-          ...prev,
-          deliveryTracking: {
-            ...prev?.deliveryTracking,
-            status: deliveryData.status || 'preparing',
-            expectedDeliveryDate: deliveryData.expectedDeliveryDate,
-          }
-        }));
-        
-        // Reload messages to show delivery status update
-        await loadData(false);
-        
-        Alert.alert('Success', 'Delivery details submitted! You can update status from the Delivery screen.');
-      } else {
-        Alert.alert('Error', response.message || 'Failed to submit delivery details');
-      }
-    } catch (error) {
-      console.error('Submit delivery error:', error);
-      Alert.alert('Error', 'Failed to submit delivery details');
-    } finally {
-      setIsSubmittingDelivery(false);
-    }
-  };
-  
   // Track delivery (navigate to delivery screen)
   const handleTrackDelivery = () => {
     if (userRole === 'vendor') {
@@ -594,7 +549,11 @@ Status: ${invoice.status.toUpperCase()}
           <SystemMessageNode 
             message={message} 
             systemEvent={message.systemEvent}
-            onNavigateToDelivery={message.systemEvent === 'quotation_accepted' ? handleTrackDelivery : null}
+            onNavigateToDelivery={
+              (message.systemEvent === 'quotation_accepted' || message.systemEvent === 'invoice_generated') 
+                ? handleTrackDelivery 
+                : null
+            }
             userRole={userRole}
           />
         )}
@@ -661,11 +620,6 @@ Status: ${invoice.status.toUpperCase()}
 
   const hasInvoiceMessage = messages.some(message => message.messageType === 'invoice');
   const chatLocked = !!order?.chatClosed || hasInvoiceMessage || order?.status === 'accepted' || order?.status === 'completed';
-  
-  // Check if vendor needs to submit delivery details
-  const needsDeliverySubmission = userRole === 'vendor' && 
-    (order?.status === 'accepted' || hasInvoiceMessage) && 
-    !order?.deliveryTracking?.expectedDeliveryDate;
   
   // Can user send messages?
   const canSendMessages = order && 
@@ -764,15 +718,7 @@ Status: ${invoice.status.toUpperCase()}
               flatListRef.current?.scrollToEnd({ animated: false });
             }
           }}
-          ListFooterComponent={
-            needsDeliverySubmission ? (
-              <DeliveryFormNode
-                order={order}
-                onSubmit={handleSubmitDelivery}
-                isSubmitting={isSubmittingDelivery}
-              />
-            ) : null
-          }
+          ListFooterComponent={null}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <MaterialCommunityIcons 

@@ -113,7 +113,26 @@ export const AttendanceProvider = ({ children }) => {
         if (!token || !isCheckedIn) return;
 
         try {
-            const response = await attendanceAPI.heartbeat(60); // Full hour of activity
+            // Compute minutes to report for this heartbeat.
+            // Prefer minutes since lastHeartbeat (if present), otherwise since activeStartTime.
+            const nowMs = Date.now();
+            let referenceMs = activeStartTime.current || nowMs;
+            if (lastHeartbeat) {
+                const parsed = Date.parse(lastHeartbeat);
+                if (!Number.isNaN(parsed)) referenceMs = parsed;
+            }
+
+            // Minutes elapsed since reference point (cap between 0 and 60)
+            let minutesElapsed = Math.floor((nowMs - referenceMs) / 60000);
+            minutesElapsed = Math.max(0, Math.min(60, minutesElapsed));
+
+            // Debug: log computed minutes and reference points to help diagnose unexpected 60-minute updates
+            console.log('[Attendance] sendHeartbeat called. minutesElapsed=', minutesElapsed, 'lastHeartbeat=', lastHeartbeat, 'activeStartTime=', activeStartTime.current);
+
+            // If nothing meaningful to report (0 minutes) still call API to update lastHeartbeat,
+            // but avoid sending a full hour at check-in.
+            console.log('[Attendance] Sending heartbeat payload:', { activeMinutes: minutesElapsed });
+            const response = await attendanceAPI.heartbeat(minutesElapsed);
 
             if (response.success) {
                 setTodayStats(prev => ({
@@ -123,6 +142,8 @@ export const AttendanceProvider = ({ children }) => {
                 }));
                 setLastHeartbeat(new Date().toISOString());
                 console.log('[Attendance] Heartbeat sent:', response.data);
+                // Reset activeStartTime to now so future heartbeats measure from here
+                activeStartTime.current = Date.now();
             }
         } catch (error) {
             console.error('[Attendance] Heartbeat error:', error);

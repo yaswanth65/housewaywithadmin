@@ -17,7 +17,9 @@ export const normalizeServerBaseUrl = (maybeUrl) => {
 };
 
 export const getDefaultServerBaseUrl = () => {
-  if (Platform.OS === 'web') return 'http://localhost:5000';
+  // On some Windows setups, "localhost" resolves to IPv6 (::1) while the backend
+  // listens only on IPv4, causing ECONNREFUSED. Default to 127.0.0.1 for reliability.
+  if (Platform.OS === 'web') return 'http://127.0.0.1:5000';
   if (Platform.OS === 'android') return 'http://10.0.2.2:5000';
   return 'http://127.0.0.1:5000';
 };

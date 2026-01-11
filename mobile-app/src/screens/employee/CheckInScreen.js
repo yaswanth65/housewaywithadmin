@@ -161,7 +161,7 @@ const CheckInScreen = ({ navigation }) => {
                 onHide={hideToast}
             />
 
-            <LinearGradient colors={[COLORS.background, '#F9F9F4', COLORS.background]} style={styles.gradient}>
+            <LinearGradient colors={['#FFFFFF', '#FFFEF5', '#FFFFFF']} style={styles.gradient}>
                 <ScrollView
                     style={styles.scrollView}
                     contentContainerStyle={styles.scrollContent}
@@ -174,16 +174,17 @@ const CheckInScreen = ({ navigation }) => {
                             <Text style={styles.welcomeText}>Welcome back</Text>
                             <Text style={styles.userName}>{user?.firstName || 'User'}</Text>
                         </View>
-                        <TouchableOpacity
-                            style={styles.refreshBtn}
-                            onPress={async () => {
-                                setIsLoading(true);
-                                await fetchStatus();
-                                setIsLoading(false);
-                            }}
-                        >
-                            <Feather name="refresh-cw" size={20} color="#333" />
-                        </TouchableOpacity>
+                        <View style={styles.headerRight}>
+                            <TouchableOpacity
+                                style={styles.profileBtn}
+                                onPress={() => navigation.navigate('SettingsScreen')}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.profileInitials}>
+                                    {user?.firstName?.[0]}{user?.lastName?.[0]}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* Time Display */}
@@ -200,9 +201,9 @@ const CheckInScreen = ({ navigation }) => {
                                 <Text style={styles.activeSessionText}>ACTIVE SESSION</Text>
                             </View>
                         ) : (
-                            <View style={[styles.activeSessionBadge, { backgroundColor: '#f0f0f0' }]}>
-                                <View style={[styles.activeDot, { backgroundColor: '#999' }]} />
-                                <Text style={[styles.activeSessionText, { color: '#999' }]}>NO ACTIVE SESSION</Text>
+                            <View style={[styles.activeSessionBadge, { backgroundColor: '#999' }]}>
+                                <View style={[styles.activeDot, { backgroundColor: '#FFFFFF' }]} />
+                                <Text style={[styles.activeSessionText, { color: '#FFFFFF' }]}>NO ACTIVE SESSION</Text>
                             </View>
                         )}
 
@@ -318,7 +319,7 @@ const CheckInScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FDFBF7',
+        backgroundColor: '#FFFEF5',
     },
     gradient: {
         flex: 1,
@@ -345,96 +346,112 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingTop: 60,
-        paddingHorizontal: 24,
+        paddingTop: 50,
+        paddingHorizontal: 20,
+        paddingBottom: 10,
+    },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
     },
     welcomeText: {
-        fontSize: 14,
-        color: '#888',
+        fontSize: 13,
+        color: '#999',
     },
     userName: {
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontSize: 22,
+        fontWeight: '700',
         color: '#1a1a1a',
         marginTop: 2,
     },
-    refreshBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#fff',
+    profileBtn: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#F4D03F',
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowColor: '#F4D03F',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    profileInitials: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#FFFFFF',
+        letterSpacing: 0.5,
     },
     timeContainer: {
         alignItems: 'center',
-        marginTop: 32,
+        marginTop: 24,
+        marginHorizontal: 16,
     },
     time: {
-        fontSize: 48,
+        fontSize: 52,
         fontWeight: '300',
         color: '#1a1a1a',
         letterSpacing: 1,
     },
     date: {
         fontSize: 14,
-        color: '#888',
-        marginTop: 4,
+        color: '#999',
+        marginTop: 6,
     },
     sessionCard: {
         backgroundColor: '#fff',
-        marginHorizontal: 24,
-        marginTop: 28,
+        marginHorizontal: 16,
+        marginTop: 24,
         borderRadius: 20,
-        padding: 24,
+        padding: 20,
         alignItems: 'center',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        elevation: 5,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+        elevation: 4,
     },
     activeSessionBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#e8f5e9',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
+        backgroundColor: '#FFF9E6',
+        paddingHorizontal: 14,
+        paddingVertical: 7,
         borderRadius: 20,
-        marginBottom: 16,
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(244, 208, 63, 0.3)',
     },
     activeDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#4caf50',
-        marginRight: 6,
+        backgroundColor: '#F4D03F',
+        marginRight: 8,
     },
     activeSessionText: {
         fontSize: 11,
         fontWeight: '700',
-        color: '#4caf50',
-        letterSpacing: 0.5,
+        color: '#E6BC00',
+        letterSpacing: 0.6,
     },
     durationContainer: {
-        marginBottom: 20,
+        marginBottom: 16,
         alignItems: 'center',
     },
     duration: {
-        fontSize: 48,
+        fontSize: 56,
         fontWeight: '300',
         color: '#1a1a1a',
         letterSpacing: 2,
     },
     durationLabel: {
         fontSize: 12,
-        color: '#888',
+        color: '#999',
         marginTop: 4,
+        fontWeight: '500',
     },
     sessionInfoRow: {
         flexDirection: 'row',
@@ -443,87 +460,90 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         paddingHorizontal: 16,
         paddingVertical: 8,
-        backgroundColor: '#f8f8f8',
+        backgroundColor: '#FFF9E6',
         borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(244, 208, 63, 0.2)',
     },
     sessionInfoLabel: {
         fontSize: 12,
-        color: '#666',
+        color: '#777',
         marginRight: 8,
     },
     sessionInfoValue: {
         fontSize: 12,
         fontWeight: '700',
-        color: '#1a1a1a',
+        color: '#E6BC00',
     },
     actionButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#D4AF37', // Dark Gold
-        paddingVertical: 14,
-        paddingHorizontal: 40,
+        backgroundColor: '#F4D03F',
+        paddingVertical: 13,
+        paddingHorizontal: 36,
         borderRadius: 30,
         gap: 10,
-        minWidth: 180,
+        minWidth: 160,
+        shadowColor: '#F4D03F',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 4,
     },
     checkOutButton: {
         backgroundColor: '#333',
+        shadowColor: '#000',
     },
     actionText: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '700',
-        color: '#1a1a1a',
+        color: '#FFFFFF',
     },
     checkOutText: {
-        color: '#fff',
+        color: '#FFFFFF',
     },
     hoursCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#fff',
-        marginHorizontal: 24,
-        marginTop: 16,
+        backgroundColor: '#FFFEF5',
+        marginHorizontal: 16,
+        marginTop: 14,
         borderRadius: 12,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(244, 208, 63, 0.15)',
     },
     hoursContent: {
         marginLeft: 12,
     },
     hoursLabel: {
         fontSize: 12,
-        color: '#888',
+        color: '#999',
+        fontWeight: '500',
     },
     hoursValue: {
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#1a1a1a',
         marginTop: 2,
     },
     clientManagementCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#fff',
-        marginHorizontal: 24,
+        backgroundColor: '#FFFEF5',
+        marginHorizontal: 16,
         marginTop: 12,
         borderRadius: 12,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(244, 208, 63, 0.15)',
     },
     cmIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 10,
-        backgroundColor: '#1a1a1a',
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: '#F4D03F',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -538,7 +558,7 @@ const styles = StyleSheet.create({
     },
     cmSubtitle: {
         fontSize: 12,
-        color: '#888',
+        color: '#999',
         marginTop: 2,
     },
 });

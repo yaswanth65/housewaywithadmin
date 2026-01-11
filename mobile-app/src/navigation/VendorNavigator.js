@@ -63,6 +63,13 @@ const ProfileStack = () => (
   </Stack.Navigator>
 );
 
+const RequestsStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="MaterialRequests" component={MaterialRequestsScreen} />
+    <Stack.Screen name="QuotationManagement" component={MaterialRequestsScreen} />
+  </Stack.Navigator>
+);
+
 /* ===========================
    MAIN TAB NAVIGATOR
 =========================== */
@@ -78,6 +85,9 @@ const VendorNavigator = () => {
             case 'Home':
               iconName = focused ? 'home' : 'home-outline';
               break;
+            case 'Requests':
+              iconName = focused ? 'file-text' : 'file-text';
+              break;
             case 'Payments':
               iconName = focused ? 'card' : 'card-outline';
               break;
@@ -86,6 +96,11 @@ const VendorNavigator = () => {
               break;
             default:
               iconName = 'ellipse';
+          }
+
+          // Use Feather icon for Requests
+          if (route.name === 'Requests') {
+            return <Ionicons name={iconName} size={22} color={color} />;
           }
 
           return <Ionicons name={iconName} size={22} color={color} />;
@@ -105,6 +120,20 @@ const VendorNavigator = () => {
         name="Home"
         component={HomeStack}
         options={{ tabBarLabel: 'Dashboard' }}
+      />
+      <Tab.Screen
+        name="Requests"
+        component={RequestsStack}
+        options={{ 
+          tabBarLabel: 'Requests',
+          tabBarIcon: ({ focused, color }) => (
+            <MaterialCommunityIcons 
+              name={focused ? 'file-document' : 'file-document-outline'} 
+              size={22} 
+              color={color} 
+            />
+          ),
+        }}
       />
       <Tab.Screen
         name="Orders"

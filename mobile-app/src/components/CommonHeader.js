@@ -38,7 +38,7 @@ const CommonHeader = ({ title, userRole, showNotifications = true }) => {
       case 'client':
         return '#4ECDC4';
       case 'employee':
-        return '#45B7D1';
+        return '#F4D03F';
       case 'executive':
         return '#96CEB4';
       case 'finance':
@@ -141,7 +141,14 @@ const CommonHeader = ({ title, userRole, showNotifications = true }) => {
                 styles.profileButton,
                 { backgroundColor: getRoleColor() },
               ]}
-              onPress={() => setMenuVisible(true)}
+              onPress={() => {
+                // For employee users (designers), go straight to Settings.
+                if ((userRole || '').toLowerCase() === 'employee' || user?.role === 'employee') {
+                  navigation.navigate('SettingsScreen');
+                } else {
+                  setMenuVisible(true);
+                }
+              }}
             >
               <Text style={styles.initialsText}>{getUserInitials()}</Text>
             </TouchableOpacity>

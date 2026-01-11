@@ -4,6 +4,7 @@ const { validationResult } = require('express-validator');
 const MaterialRequest = require('../models/MaterialRequest');
 const Project = require('../models/Project');
 const PurchaseOrder = require('../models/PurchaseOrder');
+const User = require('../models/User');
 const { authenticate, authorize, isOwner, isOwnerOrEmployee } = require('../middleware/auth');
 const { validateMaterialRequest } = require('../middleware/validation');
 
@@ -27,11 +28,8 @@ router.get('/', authenticate, async (req, res) => {
         // VendorTeam employees should see requests they created + assigned + available
         if (req.user.subRole === 'vendorTeam') {
           if (available === 'true') {
-            // Show unassigned/pending requests for vendor team
-            query.$or = [
-              { 'assignedVendors': { $size: 0 } },
-              { 'assignedVendors.vendor': { $ne: req.user._id } },
-            ];
+            // Show unassigned/pending requests
+            query.assignedVendors = { $size: 0 };
             query.status = { $in: ['pending', 'approved'] };
           } else {
             // Show requests created by OR assigned to this vendor team employee
@@ -55,10 +53,8 @@ router.get('/', authenticate, async (req, res) => {
         // If 'available' flag is set, show unassigned/pending requests
         // Otherwise show only requests assigned to this vendor
         if (available === 'true') {
-          query.$or = [
-            { 'assignedVendors': { $size: 0 } }, // No vendors assigned
-            { 'assignedVendors.vendor': { $ne: req.user._id } }, // Not assigned to this vendor
-          ];
+          // Available means not assigned to anyone yet
+          query.assignedVendors = { $size: 0 };
           query.status = { $in: ['pending', 'approved'] }; // Only show pending/approved
         } else {
           query['assignedVendors.vendor'] = req.user._id;
@@ -197,6 +193,7 @@ router.post('/', authenticate, isOwnerOrEmployee, validateMaterialRequest, async
       materials,
       priority,
       requiredBy,
+      assignedVendors,
     } = req.body;
 
     // Verify project exists and user has access
@@ -222,6 +219,41 @@ router.post('/', authenticate, isOwnerOrEmployee, validateMaterialRequest, async
       }
     }
 
+    // Optional: assign one or more vendors at creation time
+    // (Used by vendorTeam employees to target a vendor directly)
+    let normalizedAssignedVendors = [];
+    if (Array.isArray(assignedVendors) && assignedVendors.length > 0) {
+      const vendorIds = assignedVendors
+        .map((av) => (typeof av === 'string' ? av : av?.vendor))
+        .filter(Boolean);
+
+      // Deduplicate
+      const uniqueVendorIds = [...new Set(vendorIds.map(String))];
+
+      const vendors = await User.find({
+        _id: { $in: uniqueVendorIds },
+        role: 'vendor',
+        isActive: true,
+      }).select('_id');
+
+      const foundVendorIds = new Set(vendors.map((v) => v._id.toString()));
+      const invalidVendorIds = uniqueVendorIds.filter((id) => !foundVendorIds.has(String(id)));
+
+      if (invalidVendorIds.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'One or more assigned vendors are invalid',
+          data: { invalidVendorIds },
+        });
+      }
+
+      normalizedAssignedVendors = uniqueVendorIds.map((vendorId) => ({
+        vendor: vendorId,
+        assignedAt: new Date(),
+        assignedBy: req.user._id,
+      }));
+    }
+
     const materialRequest = new MaterialRequest({
       project: projectId,
       requestedBy: req.user._id,
@@ -230,12 +262,13 @@ router.post('/', authenticate, isOwnerOrEmployee, validateMaterialRequest, async
       materials,
       priority,
       requiredBy,
+      assignedVendors: normalizedAssignedVendors,
     });
 
     await materialRequest.save();
 
     // Populate the created material request
-    await materialRequest.populate('project requestedBy');
+    await materialRequest.populate('project requestedBy assignedVendors.vendor assignedVendors.assignedBy');
 
     // Emit socket event for new creation
     const io = req.app.get('io');
@@ -381,6 +414,14 @@ router.post('/:id/accept', authenticate, authorize('vendor'), async (req, res) =
     const isAlreadyAssigned = materialRequest.assignedVendors.some(
       av => av.vendor.toString() === req.user._id.toString()
     );
+
+    // If another vendor is already assigned, do not allow accepting
+    if (!isAlreadyAssigned && materialRequest.assignedVendors.length > 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'This material request is already assigned to another vendor',
+      });
+    }
 
     if (isAlreadyAssigned) {
       // Check if PO exists for this vendor and material request

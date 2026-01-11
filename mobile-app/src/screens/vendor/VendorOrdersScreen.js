@@ -177,17 +177,17 @@ const VendorOrdersScreen = ({ navigation }) => {
   // Get status configuration
   const getStatusConfig = (status) => {
     const configs = {
-      sent: { color: '#3B82F6', bgColor: '#DBEAFE', label: 'New Order', icon: 'fiber-new' },
-      in_negotiation: { color: '#F59E0B', bgColor: '#FEF3C7', label: 'Negotiating', icon: 'swap-horiz' },
-      accepted: { color: '#10B981', bgColor: '#D1FAE5', label: 'Accepted', icon: 'check-circle' },
-      in_progress: { color: '#8B5CF6', bgColor: '#EDE9FE', label: 'In Progress', icon: 'local-shipping' },
-      acknowledged: { color: '#6366F1', bgColor: '#E0E7FF', label: 'Acknowledged', icon: 'thumb-up' },
-      partially_delivered: { color: '#F97316', bgColor: '#FFEDD5', label: 'Partially Delivered', icon: 'local-shipping' },
-      rejected: { color: '#EF4444', bgColor: '#FEE2E2', label: 'Rejected', icon: 'cancel' },
-      completed: { color: '#059669', bgColor: '#D1FAE5', label: 'Completed', icon: 'verified' },
-      cancelled: { color: '#6B7280', bgColor: '#F3F4F6', label: 'Cancelled', icon: 'block' },
+      sent: { color: '#FFFFFF', bgColor: '#3B82F6', label: 'New Order', icon: 'fiber-new' },
+      in_negotiation: { color: '#FFFFFF', bgColor: '#F59E0B', label: 'Negotiating', icon: 'swap-horiz' },
+      accepted: { color: '#FFFFFF', bgColor: '#10B981', label: 'Accepted', icon: 'check-circle' },
+      in_progress: { color: '#FFFFFF', bgColor: '#8B5CF6', label: 'In Progress', icon: 'local-shipping' },
+      acknowledged: { color: '#FFFFFF', bgColor: '#6366F1', label: 'Acknowledged', icon: 'thumb-up' },
+      partially_delivered: { color: '#FFFFFF', bgColor: '#F97316', label: 'Partially Delivered', icon: 'local-shipping' },
+      rejected: { color: '#FFFFFF', bgColor: '#EF4444', label: 'Rejected', icon: 'cancel' },
+      completed: { color: '#FFFFFF', bgColor: '#059669', label: 'Completed', icon: 'verified' },
+      cancelled: { color: '#FFFFFF', bgColor: '#6B7280', label: 'Cancelled', icon: 'block' },
     };
-    return configs[status] || { color: '#6B7280', bgColor: '#F3F4F6', label: status, icon: 'help' };
+    return configs[status] || { color: '#FFFFFF', bgColor: '#6B7280', label: status, icon: 'help' };
   };
   
   // Format date
@@ -441,6 +441,20 @@ const VendorOrdersScreen = ({ navigation }) => {
                 : `No orders with "${filters.find(f => f.id === activeFilter)?.label}" status`
               }
             </Text>
+            {activeFilter === 'all' && (
+              <>
+                <Text style={styles.emptyHint}>
+                  Orders are created after you accept a material request.
+                </Text>
+                <TouchableOpacity
+                  style={styles.emptyCta}
+                  onPress={() => navigation.navigate('Home', { screen: 'MaterialRequests', params: { initialTab: 'accepted' } })}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.emptyCtaText}>Open Material Requests</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         }
       />
@@ -762,6 +776,24 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginTop: 4,
     textAlign: 'center',
+  },
+  emptyHint: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  emptyCta: {
+    marginTop: 14,
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  emptyCtaText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

@@ -79,11 +79,11 @@ describe('Card3D Component', () => {
   });
 
   it('should handle empty children', () => {
-    const { container } = render(
+    const { UNSAFE_root } = render(
       <Card3D colors={defaultProps.colors} />
     );
     
-    expect(container).toBeTruthy();
+    expect(UNSAFE_root).toBeTruthy();
   });
 
   it('should apply correct border radius', () => {

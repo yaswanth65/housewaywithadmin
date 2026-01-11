@@ -5,37 +5,37 @@
  * Usage: import { COLORS } from '../styles/colors';
  */
 
-// Premium White Theme with Gold Accents
+// Premium White Theme with Yellow Fade Accents
 export const COLORS = {
-    // Primary - Dark Gold (brand color)
-    primary: '#D4AF37',           // Dark Golden Rod
-    primaryDark: '#8B6914',       // Darker gold
-    primaryLight: '#D4A84B',      // Lighter gold
-    primaryMuted: 'rgba(184, 134, 11, 0.15)',  // Very light gold for backgrounds
+    // Primary - Yellow Fade (brand color)
+    primary: '#F4D03F',           // Vibrant Yellow
+    primaryDark: '#E6BC00',       // Dark Yellow
+    primaryLight: '#FFF9E6',      // Very light yellow
+    primaryMuted: 'rgba(244, 208, 63, 0.12)',  // Very light yellow for backgrounds
 
     // Secondary - Warm Neutrals
-    secondary: '#8B7355',         // Warm brown
-    secondaryDark: '#6B5A45',     // Dark brown
-    secondaryLight: '#A89178',    // Light brown
+    secondary: '#F9E79F',         // Light golden yellow
+    secondaryDark: '#F7DC6F',     // Medium yellow
+    secondaryLight: '#FFFFCC',    // Pale yellow
 
-    // Background colors - Clean White
+    // Background colors - Clean White with Yellow Fade
     background: '#FFFFFF',        // Clean white background
-    backgroundSecondary: '#FFFFFF', // White
-    backgroundTertiary: '#FAFAFA', // Very light gray
+    backgroundSecondary: '#FFFEF5', // Off-white with yellow tint
+    backgroundTertiary: '#FFFAEB', // Very light yellow
     backgroundLight: '#FFFFFF',   // Light background for gradients
     surface: '#FFFFFF',           // Cards and surfaces
     card: '#FFFFFF',              // Card backgrounds
     overlay: 'rgba(0, 0, 0, 0.5)', // Modal overlays
 
     // Decorative Circle Colors (for background decorations)
-    circleLight: 'rgba(184, 134, 11, 0.08)',   // Very light gold circle
-    circleMedium: 'rgba(184, 134, 11, 0.15)',  // Medium gold circle
-    circleDark: 'rgba(184, 134, 11, 0.2)',     // Darker gold circle
-    circleGradient: ['rgba(184, 134, 11, 0.1)', 'rgba(212, 168, 75, 0.08)'], // Circle gradient
+    circleLight: 'rgba(244, 208, 63, 0.08)',   // Very light yellow circle
+    circleMedium: 'rgba(244, 208, 63, 0.12)',  // Medium yellow circle
+    circleDark: 'rgba(244, 208, 63, 0.18)',    // Darker yellow circle
+    circleGradient: ['rgba(244, 208, 63, 0.1)', 'rgba(255, 248, 230, 0.08)'], // Circle gradient
 
     // Backward compatibility aliases
     cardBg: '#FFFFFF',            // Alias for card
-    cardBorder: 'rgba(184, 134, 11, 0.1)', // Light gold border
+    cardBorder: 'rgba(244, 208, 63, 0.15)', // Light yellow border
 
     // Text colors
     text: '#1A1A1A',              // Primary text - near black
@@ -74,19 +74,19 @@ export const COLORS = {
     gray900: '#212121',
 
     // Input field colors
-    inputBg: '#FAFAFA',           // Input background
-    inputBorder: 'rgba(184, 134, 11, 0.15)', // Input border
+    inputBg: '#FFFAEB',           // Light yellow background
+    inputBorder: 'rgba(244, 208, 63, 0.15)', // Input border
 
     // Additional text aliases
     textDim: '#999999',           // Alias for textMuted
 
     // Border colors
-    border: 'rgba(229, 163, 59, 0.2)',        // Light golden border
-    borderLight: 'rgba(0, 0, 0, 0.08)',       // Very subtle border
-    borderMedium: 'rgba(0, 0, 0, 0.12)',      // Medium border
-    borderDark: 'rgba(0, 0, 0, 0.2)',         // Dark border
-    borderPrimary: '#E5A33B',                 // Golden border
-    borderFocus: '#C88A2E',                   // Focused input border
+    border: 'rgba(244, 208, 63, 0.15)',        // Light yellow border
+    borderLight: 'rgba(244, 208, 63, 0.08)',   // Very subtle yellow border
+    borderMedium: 'rgba(244, 208, 63, 0.12)',  // Medium yellow border
+    borderDark: 'rgba(244, 208, 63, 0.2)',     // Dark yellow border
+    borderPrimary: '#F4D03F',                  // Yellow border
+    borderFocus: '#E6BC00',                    // Focused input border
 
     // Special colors
     white: '#FFFFFF',
@@ -94,8 +94,8 @@ export const COLORS = {
     transparent: 'transparent',
 
     // Gradient support (use with LinearGradient)
-    gradientPrimary: ['#E5A33B', '#C88A2E'],
-    gradientSecondary: ['#F2C36B', '#E5A33B'],
+    gradientPrimary: ['#F4D03F', '#FFE680'],
+    gradientSecondary: ['#FFE680', '#FFF9E6'],
 };
 
 // Complete theme object for more structured usage

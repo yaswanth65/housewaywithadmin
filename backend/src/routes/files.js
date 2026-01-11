@@ -145,7 +145,11 @@ router.post('/upload', authenticate, (req, res, next) => {
       });
     }
 
-    const category = req.body.category || 'documents';
+    const allowedUploadCategories = ['documents', 'images', 'quotations', 'purchase-orders', 'work_update'];
+    const requestedCategory = req.body.category;
+    const category = allowedUploadCategories.includes(requestedCategory)
+      ? requestedCategory
+      : 'documents';
 
     // Upload to GCS
     const { filename, url } = await uploadToGCS({

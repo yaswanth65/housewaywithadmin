@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 const bucketName = process.env.GCS_BUCKET;
+const keyFilename = process.env.GCS_KEYFILE;
 
 // Initialize GCS client (optional)
 let storage = null;
@@ -11,9 +12,12 @@ let gcsEnabled = false;
 
 try {
   if (bucketName) {
+    if (keyFilename && !fs.existsSync(keyFilename)) {
+      throw new Error(`GCS_KEYFILE not found at: ${keyFilename}`);
+    }
     storage = new Storage({
       projectId: process.env.GCS_PROJECT_ID,
-      keyFilename: process.env.GCS_KEYFILE,
+      keyFilename,
     });
     bucket = storage.bucket(bucketName);
     gcsEnabled = true;
@@ -204,7 +208,12 @@ const getSignedUrl = async (filePath, expiresInMinutes = 60) => {
       // Local uploads are publicly served by /uploads
       if (!filePath) return '';
       if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath;
-      return `${getBackendBaseUrl()}/${String(filePath).replace(/^\/+/, '')}`;
+      const normalized = String(filePath).replace(/^\/+/, '');
+      const withUploadsPrefix =
+        normalized.startsWith('uploads/') || normalized.startsWith('uploads\\')
+          ? normalized
+          : `uploads/${normalized}`;
+      return `${getBackendBaseUrl()}/${withUploadsPrefix.replace(/\\/g, '/')}`;
     }
     const options = {
       version: 'v4',

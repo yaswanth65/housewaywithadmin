@@ -199,16 +199,47 @@ const purchaseOrderSchema = new mongoose.Schema({
   deliveryTracking: {
     status: {
       type: String,
-      enum: ['pending', 'processing', 'shipped', 'in_transit', 'delivered', 'delayed', 'cancelled'],
-      default: 'pending',
+      // Keep legacy values for backward compatibility; prefer the UI-aligned values.
+      enum: [
+        'not_started',
+        'preparing',
+        'packed',
+        'dispatched',
+        'in_transit',
+        'out_for_delivery',
+        'partially_delivered',
+        'delivered',
+        // legacy
+        'pending',
+        'processing',
+        'shipped',
+        'delayed',
+        'cancelled',
+      ],
+      default: 'not_started',
     },
     trackingNumber: { type: String, default: '' },
     carrier: { type: String, default: '' },
     expectedArrival: { type: Date, default: null },
     expectedDeliveryDate: { type: Date, default: null },
+    actualArrival: { type: Date, default: null },
     notes: { type: String, default: '' },
     updatedAt: { type: Date, default: null },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    updates: {
+      type: [
+        {
+          status: { type: String, default: '' },
+          notes: { type: String, default: '' },
+          updatedAt: { type: Date, default: null },
+          updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+          trackingNumber: { type: String, default: '' },
+          carrier: { type: String, default: '' },
+          expectedArrival: { type: Date, default: null },
+        },
+      ],
+      default: [],
+    },
   },
   deliveryAddress: {
     street: {

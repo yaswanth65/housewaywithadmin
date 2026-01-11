@@ -155,6 +155,13 @@ const validateMaterialRequest = [
     .withMessage('Project ID is required')
     .isMongoId()
     .withMessage('Invalid project ID format'),
+
+  body('title')
+    .trim()
+    .notEmpty()
+    .withMessage('Request title is required')
+    .isLength({ max: 100 })
+    .withMessage('Request title cannot exceed 100 characters'),
   
   body('materials')
     .isArray({ min: 1 })
@@ -173,6 +180,40 @@ const validateMaterialRequest = [
     .trim()
     .notEmpty()
     .withMessage('Material unit is required'),
+
+  body('materials.*.category')
+    .trim()
+    .notEmpty()
+    .withMessage('Material category is required')
+    .isIn(['cement', 'steel', 'wood', 'tiles', 'paint', 'electrical', 'plumbing', 'hardware', 'other'])
+    .withMessage('Invalid material category'),
+
+  body('materials.*.requiredBy')
+    .notEmpty()
+    .withMessage('Material requiredBy date is required')
+    .isISO8601()
+    .withMessage('Material requiredBy must be a valid date'),
+
+  body('priority')
+    .optional()
+    .isIn(['low', 'medium', 'high', 'urgent'])
+    .withMessage('Priority must be one of: low, medium, high, urgent'),
+
+  body('requiredBy')
+    .notEmpty()
+    .withMessage('Required by date is required')
+    .isISO8601()
+    .withMessage('Required by must be a valid date'),
+
+  body('assignedVendors')
+    .optional()
+    .isArray()
+    .withMessage('assignedVendors must be an array'),
+
+  body('assignedVendors.*.vendor')
+    .optional()
+    .isMongoId()
+    .withMessage('Invalid vendor ID format'),
   
   body('description')
     .optional()

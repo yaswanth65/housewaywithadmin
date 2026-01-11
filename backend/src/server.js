@@ -208,6 +208,7 @@ const routes = [
   { path: '/api/dashboard', file: './routes/dashboard', name: 'Dashboard' },
   { path: '/api/work-status', file: './routes/workStatus', name: 'Work Status' },
   { path: '/api/attendance', file: './routes/attendance', name: 'Attendance' },
+  { path: '/api/notifications', file: './routes/notifications', name: 'Notifications' },
 ];
 
 routes.forEach(route => {

@@ -6,7 +6,7 @@ const vendorInvoiceSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      index: true,
+      // Note: unique:true already creates an index, no need for index:true
     },
     purchaseOrder: {
       type: mongoose.Schema.Types.ObjectId,
@@ -106,6 +106,18 @@ const vendorInvoiceSchema = new mongoose.Schema(
     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     approvedAt: { type: Date, default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    // Vendor uploaded invoice documents
+    attachments: [
+      {
+        filename: { type: String, required: true },
+        originalName: { type: String },
+        mimeType: { type: String },
+        size: { type: Number },
+        url: { type: String, required: true },
+        uploadedAt: { type: Date, default: Date.now },
+        uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      },
+    ],
   },
   { timestamps: true }
 );

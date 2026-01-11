@@ -11,6 +11,7 @@ const { authenticate, authorize, isOwner, isOwnerOrEmployee } = require('../midd
 const { validateProject } = require('../middleware/validation');
 const { uploadMultiple, getFileUrl } = require('../middleware/upload');
 const { uploadToGCS } = require('../utils/gcs');
+const NotificationService = require('../utils/notificationService');
 
 // Memory storage for GCS media uploads
 const memoryStorage = multer.memoryStorage();
@@ -464,6 +465,25 @@ router.put('/:id/assign-employee', authenticate, authorize('owner', 'employee'),
     await project.populate('assignedEmployees', 'firstName lastName email');
     const io = req.app.get('io');
     if (io) io.emit('projectUpdated', { operation: 'employeeAssigned', project });
+
+    // Send notification to the assigned employee (executive)
+    try {
+      // Check if assigned by a designer (employee with designTeam subRole)
+      const isAssignedByDesigner = req.user.role === 'employee' && req.user.subRole === 'designTeam';
+      const isAssignedByOwner = req.user.role === 'owner';
+      
+      if (isAssignedByDesigner || isAssignedByOwner) {
+        await NotificationService.notifyExecutiveAddedToProject({
+          executiveId: employeeId,
+          designerId: req.user._id,
+          projectId: project._id,
+          projectTitle: project.title,
+        });
+      }
+    } catch (notifError) {
+      console.error('Failed to send notification:', notifError);
+      // Don't fail the request if notification fails
+    }
 
     res.json({
       success: true,
@@ -965,19 +985,71 @@ router.post('/:id/timeline', authenticate, isOwnerOrEmployee, async (req, res) =
 
     await timelineEvent.save();
 
+    // If this is a milestone event, also sync to project's progress.milestones
+    // This ensures the client timeline animation reflects the updates
+    if (eventType === 'milestone') {
+      // Initialize milestones array if not exists
+      if (!project.progress) {
+        project.progress = { percentage: 0, milestones: [] };
+      }
+      if (!project.progress.milestones) {
+        project.progress.milestones = [];
+      }
+
+      // Check if milestone with same title exists
+      const existingIndex = project.progress.milestones.findIndex(
+        m => m.name?.toLowerCase() === title.toLowerCase() || m.title?.toLowerCase() === title.toLowerCase()
+      );
+
+      const milestoneData = {
+        name: title,
+        title: title,
+        description: description,
+        status: status,
+        targetDate: endDate ? new Date(endDate) : undefined,
+        completedDate: status === 'completed' ? new Date() : undefined,
+      };
+
+      if (existingIndex >= 0) {
+        // Update existing milestone
+        project.progress.milestones[existingIndex] = {
+          ...project.progress.milestones[existingIndex],
+          ...milestoneData,
+        };
+      } else {
+        // Add new milestone
+        project.progress.milestones.push(milestoneData);
+      }
+
+      // Update progress percentage based on completed milestones
+      const totalMilestones = project.progress.milestones.length;
+      const completedMilestones = project.progress.milestones.filter(m => m.status === 'completed').length;
+      project.progress.percentage = totalMilestones > 0 
+        ? Math.round((completedMilestones / totalMilestones) * 100) 
+        : 0;
+      project.progress.lastUpdated = new Date();
+      project.progress.updatedBy = req.user._id;
+
+      await project.save();
+    }
+
     const io = req.app.get('io');
     if (io) {
       io.emit('projectTimelineUpdated', {
         projectId: id,
         clientId: project.client._id,
-        event: timelineEvent
+        event: timelineEvent,
+        projectProgress: project.progress, // Include updated progress
       });
     }
 
     res.status(201).json({
       success: true,
       message: 'Timeline event added successfully',
-      data: { timelineEvent },
+      data: { 
+        timelineEvent,
+        projectProgress: project.progress, // Include updated progress in response
+      },
     });
   } catch (error) {
     console.error('Add timeline event error:', error);

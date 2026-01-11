@@ -1,13 +1,13 @@
 /**
- * Test vendor login and API responses for vendoor@example.com
+ * Test vendor login and API responses
  * Run with: node scripts/testVendorLogin.js
  */
 
 const axios = require('axios');
 
 const BASE_URL = 'http://127.0.0.1:5000/api';
-const EMAIL = 'vendoor@example.com';
-const PASSWORD = 'Yaswanthpassword65@';
+const EMAIL = 'vendor1@company.com';
+const PASSWORD = 'password123';
 
 async function testVendorFlow() {
   console.log('=== Testing Vendor Login and API Flow ===\n');

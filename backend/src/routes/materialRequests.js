@@ -7,6 +7,7 @@ const PurchaseOrder = require('../models/PurchaseOrder');
 const User = require('../models/User');
 const { authenticate, authorize, isOwner, isOwnerOrEmployee } = require('../middleware/auth');
 const { validateMaterialRequest } = require('../middleware/validation');
+const NotificationService = require('../utils/notificationService');
 
 /**
  * @route   GET /api/material-requests
@@ -269,6 +270,26 @@ router.post('/', authenticate, isOwnerOrEmployee, validateMaterialRequest, async
 
     // Populate the created material request
     await materialRequest.populate('project requestedBy assignedVendors.vendor assignedVendors.assignedBy');
+
+    // Send notifications to assigned vendors
+    if (normalizedAssignedVendors.length > 0) {
+      try {
+        const notificationPromises = normalizedAssignedVendors.map((av) =>
+          NotificationService.notifyVendorAssignedToProject({
+            vendorId: av.vendor,
+            executiveId: req.user._id,
+            projectId: projectId,
+            projectTitle: project.title,
+            materialRequestTitle: title,
+            materialRequestId: materialRequest._id,
+          })
+        );
+        await Promise.all(notificationPromises);
+      } catch (notifError) {
+        console.error('Failed to send vendor notifications:', notifError);
+        // Don't fail the request if notification fails
+      }
+    }
 
     // Emit socket event for new creation
     const io = req.app.get('io');

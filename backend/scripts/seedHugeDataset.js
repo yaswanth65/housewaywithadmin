@@ -218,11 +218,9 @@ async function seedHugeDataset() {
           employees[5 + (i % 5)]._id, // Vendor team
           employees[10 + (i % 5)]._id, // Execution team
         ],
-        assignedVendors: [
-          vendors[i % 20]._id,
-          vendors[(i + 1) % 20]._id,
-          vendors[(i + 2) % 20]._id,
-        ],
+        // Note: Vendors are NOT pre-assigned. They should only be assigned 
+        // when there is a material requirement (via material requests flow)
+        assignedVendors: [],
         status,
         priority: getRandomElement(priorities),
         budget: {

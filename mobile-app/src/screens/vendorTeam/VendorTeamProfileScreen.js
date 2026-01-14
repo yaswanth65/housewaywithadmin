@@ -19,7 +19,7 @@ import ToastMessage from '../../components/common/ToastMessage';
 import theme from '../../styles/theme';
 
 export default function VendorTeamProfileScreen({ navigation }) {
-    const { user, updateUser, logout } = useAuth();
+    const { user, updateUserLocally, logout } = useAuth();
     const [loading, setLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [profileImage, setProfileImage] = useState(user?.profileImage || null);
@@ -110,8 +110,8 @@ export default function VendorTeamProfileScreen({ navigation }) {
             const uploadResponse = await usersAPI.uploadProfilePhoto(formData);
             if (uploadResponse.success) {
                 setProfileImage(uploadResponse.data.profileImage);
-                if (updateUser) {
-                    updateUser({ ...user, profileImage: uploadResponse.data.profileImage });
+                if (updateUserLocally) {
+                    updateUserLocally({ ...user, profileImage: uploadResponse.data.profileImage });
                 }
                 showToast('Profile photo updated!', 'success');
             } else {
@@ -131,8 +131,8 @@ export default function VendorTeamProfileScreen({ navigation }) {
             const response = await usersAPI.deleteProfilePhoto();
             if (response.success) {
                 setProfileImage(null);
-                if (updateUser) {
-                    updateUser({ ...user, profileImage: null });
+                if (updateUserLocally) {
+                    updateUserLocally({ ...user, profileImage: null });
                 }
                 showToast('Profile photo removed', 'success');
             } else {

@@ -24,6 +24,9 @@ const CreateProjectScreen = () => {
   const scrollRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Check if user is a designer employee - designers should NOT create new clients
+  const isDesignerEmployee = user?.role === 'employee' && user?.subRole === 'designTeam';
+
   /* Toast State */
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
 
@@ -265,22 +268,26 @@ const CreateProjectScreen = () => {
           <div style={styles.section}>
             <div style={styles.sectionHeader}>
               <h2 style={styles.sectionTitle}>Client Details</h2>
-              <div style={styles.toggleContainer}>
-                <span style={{ ...styles.toggleLabel, ...((!isNewClient) && styles.activeLabel) }}>Existing</span>
-                <label style={styles.switchLabel}>
-                  <input
-                    type="checkbox"
-                    checked={isNewClient}
-                    onChange={(e) => setIsNewClient(e.target.checked)}
-                    style={styles.switchInput}
-                  />
-                  <span style={{ ...styles.switch, ...(isNewClient && styles.switchActive) }}></span>
-                </label>
-                <span style={{ ...styles.toggleLabel, ...(isNewClient && styles.activeLabel) }}>New</span>
-              </div>
+              {/* Hide the New/Existing toggle for designer employees - they can only select existing clients */}
+              {!isDesignerEmployee && (
+                <div style={styles.toggleContainer}>
+                  <span style={{ ...styles.toggleLabel, ...((!isNewClient) && styles.activeLabel) }}>Existing</span>
+                  <label style={styles.switchLabel}>
+                    <input
+                      type="checkbox"
+                      checked={isNewClient}
+                      onChange={(e) => setIsNewClient(e.target.checked)}
+                      style={styles.switchInput}
+                    />
+                    <span style={{ ...styles.switch, ...(isNewClient && styles.switchActive) }}></span>
+                  </label>
+                  <span style={{ ...styles.toggleLabel, ...(isNewClient && styles.activeLabel) }}>New</span>
+                </div>
+              )}
             </div>
 
-            {isNewClient ? (
+            {/* Designer employees can only select existing clients, not create new ones */}
+            {isNewClient && !isDesignerEmployee ? (
               <div style={styles.formGroup}>
                 <div style={styles.row}>
                   <div style={{ flex: 1, marginRight: 8 }}>

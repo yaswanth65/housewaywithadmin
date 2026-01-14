@@ -26,7 +26,7 @@ const PurchaseOrdersScreen = ({ navigation, route }) => {
         try {
             const response = await purchaseOrdersAPI.getPurchaseOrders();
             // Handle the response properly
-            const data = response.success 
+            const data = response.success
                 ? (response.data?.purchaseOrders || response.data || [])
                 : [];
             // Normalize data to handle both formats
@@ -34,9 +34,9 @@ const PurchaseOrdersScreen = ({ navigation, route }) => {
                 ...order,
                 id: order._id || order.id,
                 poNumber: order.purchaseOrderNumber || order.poNumber,
-                vendorName: order.vendor?.vendorDetails?.companyName || 
-                           `${order.vendor?.firstName || ''} ${order.vendor?.lastName || ''}`.trim() ||
-                           order.vendorName || 'Unknown Vendor',
+                vendorName: order.vendor?.vendorDetails?.companyName ||
+                    `${order.vendor?.firstName || ''} ${order.vendor?.lastName || ''}`.trim() ||
+                    order.vendorName || 'Unknown Vendor',
                 items: order.items?.length ? `${order.items.length} items` : order.items,
                 amount: order.totalAmount || order.finalAmount || order.amount || 0,
             }));
@@ -72,7 +72,7 @@ const PurchaseOrdersScreen = ({ navigation, route }) => {
             return filteredOrders;
         }
 
-        return orders.filter(item => 
+        return orders.filter(item =>
             (item.poNumber || '').toLowerCase().includes(search.toLowerCase()) ||
             (item.vendorName || '').toLowerCase().includes(search.toLowerCase())
         );
@@ -81,12 +81,12 @@ const PurchaseOrdersScreen = ({ navigation, route }) => {
     const renderItem = ({ item }) => {
         // Map delivery tracking status to display status
         const deliveryStatus = item.deliveryTracking?.status || 'not_started';
-        const isShipped = ['packed', 'dispatched', 'in_transit', 'out_for_delivery', 'delivered'].includes(deliveryStatus);
+        const isShipped = ['dispatched', 'in_transit', 'out_for_delivery', 'delivered'].includes(deliveryStatus);
         const isArriving = ['in_transit', 'out_for_delivery', 'delivered'].includes(deliveryStatus);
         const isDelivered = deliveryStatus === 'delivered';
-        
+
         return (
-            <TouchableOpacity 
+            <TouchableOpacity
                 style={styles.card}
                 onPress={() => navigation.navigate('NegotiationChat', { orderId: item.id || item._id, userRole: 'owner' })}
                 activeOpacity={0.7}
@@ -114,19 +114,19 @@ const PurchaseOrdersScreen = ({ navigation, route }) => {
                         </View>
                         <View style={[styles.line, isArriving && styles.activeLine]} />
 
-                    <View style={styles.stepItem}>
-                        <View style={[styles.dot, isArriving ? styles.activeDot : styles.inactiveDot]} />
-                        <Text style={styles.stepText}>Arriving</Text>
-                        {isArriving && !isDelivered && <Text style={styles.eta}>(Soon)</Text>}
+                        <View style={styles.stepItem}>
+                            <View style={[styles.dot, isArriving ? styles.activeDot : styles.inactiveDot]} />
+                            <Text style={styles.stepText}>Arriving</Text>
+                            {isArriving && !isDelivered && <Text style={styles.eta}>(Soon)</Text>}
+                        </View>
                     </View>
                 </View>
-            </View>
-            
-            <View style={styles.cardAction}>
-                <Text style={styles.cardActionText}>Tap to view details</Text>
-                <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
-            </View>
-        </TouchableOpacity>
+
+                <View style={styles.cardAction}>
+                    <Text style={styles.cardActionText}>Tap to view details</Text>
+                    <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                </View>
+            </TouchableOpacity>
         );
     };
 
@@ -138,9 +138,9 @@ const PurchaseOrdersScreen = ({ navigation, route }) => {
 
             <View style={styles.searchBox}>
                 <Ionicons name="search" size={18} color="#999" />
-                <TextInput 
-                    placeholder="Search PO Number or Vendor..." 
-                    style={styles.searchInput} 
+                <TextInput
+                    placeholder="Search PO Number or Vendor..."
+                    style={styles.searchInput}
                     value={search}
                     onChangeText={setSearch}
                 />
@@ -152,7 +152,7 @@ const PurchaseOrdersScreen = ({ navigation, route }) => {
                         <Ionicons name="filter" size={16} color="#92400E" />
                         <Text style={styles.filterBannerText}>Showing specific order</Text>
                     </View>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         onPress={() => setFilteredOrders(orders)}
                         style={{ backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 }}
                     >
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
 
     statusContainer: { borderTopWidth: 1, borderTopColor: '#f5f5f5', paddingTop: 12 },
     statusLabel: { fontSize: 12, color: '#999', marginBottom: 8 },
-    
+
     steps: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     stepItem: { alignItems: 'center', width: 60 },
     dot: { width: 12, height: 12, borderRadius: 6, marginBottom: 4 },

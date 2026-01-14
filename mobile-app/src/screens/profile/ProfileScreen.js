@@ -30,7 +30,7 @@ import { StandardCard } from '../../components/StandardCard';
 // } from '../../utils/permissions';
 
 const ProfileScreen = ({ navigation }) => {
-  const { user, updateUser, logout } = useAuth();
+  const { user, updateUser, updateUserLocally, logout } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -245,8 +245,9 @@ const ProfileScreen = ({ navigation }) => {
             if (uploadResponse.success) {
               setProfileImage(uploadResponse.data.profileImage);
 
-              // Update local user context
-              const result = await updateUser(uploadResponse.data.user);
+              // Update local user context with the user returned from upload API
+              // Use updateUserLocally to avoid making another API call
+              const result = await updateUserLocally(uploadResponse.data.user);
               if (result.success) {
                 Alert.alert('Success', 'Profile photo updated successfully!');
               } else {

@@ -137,7 +137,8 @@ export const mockProjects = [
         description: 'Complete renovation of G+1 villa with modern aesthetics.',
         client: mockUsers.find(u => u._id === 'cli001'),
         assignedEmployees: [mockUsers.find(u => u._id === 'emp001'), mockUsers.find(u => u._id === 'emp003')],
-        assignedVendors: [mockUsers.find(u => u._id === 'vnd001')],
+        // Vendors are NOT pre-assigned - they get assigned via material requests
+        assignedVendors: [],
         status: 'in-progress',
         priority: 'high',
         budget: {
@@ -169,7 +170,8 @@ export const mockProjects = [
         description: 'Interior design for 3BHK high-rise apartment.',
         client: mockUsers.find(u => u._id === 'cli002'),
         assignedEmployees: [mockUsers.find(u => u._id === 'emp001')],
-        assignedVendors: [mockUsers.find(u => u._id === 'vnd002')],
+        // Vendors are NOT pre-assigned - they get assigned via material requests
+        assignedVendors: [],
         status: 'planning',
         priority: 'medium',
         budget: {

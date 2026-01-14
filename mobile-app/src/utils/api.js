@@ -306,6 +306,8 @@ export const attendanceAPI = {
     api.get(`/attendance/employee/${employeeId}`, { params: { period } }),
   // Get attendance for a specific user (admin can fetch any employee, employee can fetch self)
   getEmployeeAttendance: (userId) => api.get('/attendance', { params: { userId } }),
+  // Get all employees' attendance (owner only)
+  getAllAttendance: (params = {}) => api.get('/attendance/all', { params }),
 };
 
 // -----------------------------
@@ -408,6 +410,14 @@ export const vendorInvoicesAPI = {
       headers: { 'Content-Type': 'application/json' }
     }),
   downloadInvoice: (id) => api.get(`/vendor-invoices/${id}/download`),
+  // Upload invoice document (PDF/image) from vendor
+  uploadInvoiceDocument: (id, formData) =>
+    api.post(`/vendor-invoices/${id}/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+  // Delete attachment from invoice
+  deleteAttachment: (invoiceId, attachmentId) =>
+    api.delete(`/vendor-invoices/${invoiceId}/attachments/${attachmentId}`),
 };
 
 // -----------------------------
@@ -502,6 +512,29 @@ export const serviceRequestsAPI = {
   
   // Get comments
   getComments: (id) => api.get(`/service-requests/${id}/comments`),
+};
+
+// -----------------------------
+// 🔔 NOTIFICATIONS API
+// -----------------------------
+export const notificationsAPI = {
+  // Get all notifications (paginated)
+  getNotifications: (params = {}) => api.get('/notifications', { params }),
+  
+  // Get unread count
+  getUnreadCount: () => api.get('/notifications/unread-count'),
+  
+  // Mark single notification as read
+  markAsRead: (id) => api.put(`/notifications/${id}/read`),
+  
+  // Mark all notifications as read
+  markAllAsRead: () => api.put('/notifications/mark-all-read'),
+  
+  // Delete a notification
+  deleteNotification: (id) => api.delete(`/notifications/${id}`),
+  
+  // Delete all notifications
+  deleteAllNotifications: () => api.delete('/notifications'),
 };
 
 // -----------------------------

@@ -41,7 +41,7 @@ export default function MaterialRequests({ navigation, route }) {
   // Initialize socket connection
   useEffect(() => {
     const SOCKET_URL = getSocketBaseUrl();
-    
+
     console.log('[MaterialRequests] Connecting to socket:', SOCKET_URL);
     socketRef.current = io(SOCKET_URL, {
       transports: ['websocket'],
@@ -82,7 +82,7 @@ export default function MaterialRequests({ navigation, route }) {
   // Handle real-time material request updates
   const handleMaterialRequestUpdate = (data) => {
     const { operation, materialRequest } = data;
-    
+
     console.log('[MaterialRequests] Processing update:', operation, materialRequest?._id);
 
     switch (operation) {
@@ -93,25 +93,25 @@ export default function MaterialRequests({ navigation, route }) {
           loadData();
         }
         break;
-      
+
       case 'vendorAccepted':
         // Refresh both tabs when a vendor accepts a request
         loadData();
         break;
-      
+
       case 'updated':
       case 'rejected':
         // Refresh current view
         loadData();
         break;
-      
+
       default:
         console.log('[MaterialRequests] Unknown operation:', operation);
     }
   };
 
-  useEffect(() => { 
-    loadData(); 
+  useEffect(() => {
+    loadData();
   }, [activeTab]);
 
   const loadData = async () => {
@@ -119,12 +119,12 @@ export default function MaterialRequests({ navigation, route }) {
       setLoading(true);
       setErrorMessage('');
       console.log(`[MaterialRequests] Loading ${activeTab} requests...`);
-      
+
       if (activeTab === 'approved') {
         // Load approved quotations
         const res = await quotationsAPI.getQuotations({ status: 'approved' });
         console.log('[MaterialRequests] Approved quotations response:', res);
-        
+
         if (res.success) {
           setApprovedQuotations(res.data.quotations || []);
           console.log('[MaterialRequests] Found', res.data.quotations?.length || 0, 'approved quotations');
@@ -133,12 +133,12 @@ export default function MaterialRequests({ navigation, route }) {
         // Load requests assigned to me (all statuses)
         const res = await materialRequestsAPI.getMaterialRequests({ limit: 100, status: 'all' });
         console.log('[MaterialRequests] My requests response:', res);
-        
+
         if (res.success) {
           const requests = res.data.materialRequests || [];
           setMyRequests(requests);
           console.log('[MaterialRequests] Found', requests.length, 'accepted requests');
-          
+
           // Load quotations for each accepted request
           await loadQuotations(requests);
         }
@@ -161,13 +161,13 @@ export default function MaterialRequests({ navigation, route }) {
 
       // Get all request IDs
       const requestIds = requests.map(r => r._id);
-      
+
       // Load all quotations for these requests in a single batch request
-      const res = await quotationsAPI.getQuotations({ 
+      const res = await quotationsAPI.getQuotations({
         materialRequestIds: requestIds.join(','),
         limit: requestIds.length * 5 // Allow up to 5 quotations per request
       });
-      
+
       if (res.success && res.data.quotations) {
         // Group quotations by material request ID
         const quotationsByRequest = {};
@@ -180,20 +180,20 @@ export default function MaterialRequests({ navigation, route }) {
             quotationsByRequest[requestId].push(quotation);
           }
         });
-        
+
         // For each request, get the most recent quotation
         const latestQuotations = {};
         Object.keys(quotationsByRequest).forEach(requestId => {
           const quotations = quotationsByRequest[requestId];
           if (quotations && quotations.length > 0) {
             // Sort by creation date and get the most recent
-            const sorted = quotations.sort((a, b) => 
+            const sorted = quotations.sort((a, b) =>
               new Date(b.createdAt) - new Date(a.createdAt)
             );
             latestQuotations[requestId] = sorted[0];
           }
         });
-        
+
         setQuotations(latestQuotations);
         console.log('[MaterialRequests] Loaded quotations:', latestQuotations);
       } else {
@@ -211,7 +211,7 @@ export default function MaterialRequests({ navigation, route }) {
       const res = await materialRequestsAPI.acceptMaterialRequest(request._id);
 
       const purchaseOrderId = res?.data?.purchaseOrder?._id;
-      
+
       if (res.success) {
         // Show success message
         const successMessage = purchaseOrderId
@@ -233,16 +233,18 @@ export default function MaterialRequests({ navigation, route }) {
             'Success!',
             successMessage,
             [
-              { text: 'OK', onPress: () => {
-                loadData();
-                setActiveTab('accepted');
-                if (purchaseOrderId) {
-                  navigation.navigate('NegotiationChat', {
-                    orderId: purchaseOrderId,
-                    userRole: 'vendor',
-                  });
+              {
+                text: 'OK', onPress: () => {
+                  loadData();
+                  setActiveTab('accepted');
+                  if (purchaseOrderId) {
+                    navigation.navigate('NegotiationChat', {
+                      orderId: purchaseOrderId,
+                      userRole: 'vendor',
+                    });
+                  }
                 }
-              }}
+              }
             ]
           );
         }
@@ -262,16 +264,16 @@ export default function MaterialRequests({ navigation, route }) {
             res.message || 'Failed to accept request',
             existingPurchaseOrderId
               ? [
-                  {
-                    text: 'Open Chat',
-                    onPress: () =>
-                      navigation.navigate('NegotiationChat', {
-                        orderId: existingPurchaseOrderId,
-                        userRole: 'vendor',
-                      }),
-                  },
-                  { text: 'OK' },
-                ]
+                {
+                  text: 'Open Chat',
+                  onPress: () =>
+                    navigation.navigate('NegotiationChat', {
+                      orderId: existingPurchaseOrderId,
+                      userRole: 'vendor',
+                    }),
+                },
+                { text: 'OK' },
+              ]
               : [{ text: 'OK' }]
           );
         }
@@ -294,16 +296,16 @@ export default function MaterialRequests({ navigation, route }) {
           errorMsg,
           existingPurchaseOrderId
             ? [
-                {
-                  text: 'Open Chat',
-                  onPress: () =>
-                    navigation.navigate('NegotiationChat', {
-                      orderId: existingPurchaseOrderId,
-                      userRole: 'vendor',
-                    }),
-                },
-                { text: 'OK' },
-              ]
+              {
+                text: 'Open Chat',
+                onPress: () =>
+                  navigation.navigate('NegotiationChat', {
+                    orderId: existingPurchaseOrderId,
+                    userRole: 'vendor',
+                  }),
+              },
+              { text: 'OK' },
+            ]
             : [{ text: 'OK' }]
         );
       }
@@ -312,7 +314,7 @@ export default function MaterialRequests({ navigation, route }) {
 
   const createQuotation = (request) => {
     const existingQuotation = quotations[request._id];
-    
+
     if (existingQuotation) {
       // If quotation is approved, only allow viewing (no updates)
       if (existingQuotation.status === 'approved') {
@@ -323,16 +325,16 @@ export default function MaterialRequests({ navigation, route }) {
         }
         return;
       }
-      
+
       // If quotation exists but not approved, navigate to edit/update mode
-      navigation.navigate('QuotationManagement', { 
+      navigation.navigate('QuotationManagement', {
         materialRequest: request,
         quotation: existingQuotation,
         mode: 'update'
       });
     } else {
       // No quotation exists, create new
-      navigation.navigate('QuotationManagement', { 
+      navigation.navigate('QuotationManagement', {
         materialRequest: request,
         mode: 'create'
       });
@@ -346,7 +348,7 @@ Status: ${quotation.status}
 Total: ₹${quotation.totalAmount?.toFixed(2) || '0.00'}
 Items: ${quotation.items?.length || 0}
 Delivery: ${quotation.deliveryTerms?.deliveryTime || 'N/A'} days`;
-    
+
     if (Platform.OS === 'web') {
       window.alert(details);
     } else {
@@ -355,22 +357,40 @@ Delivery: ${quotation.deliveryTerms?.deliveryTime || 'N/A'} days`;
   };
 
   const openNegotiationChat = (request) => {
-    // The new flow uses purchase orders for negotiation
-    // When vendor accepts a material request, a purchase order is created
-    // We need to navigate to the negotiation chat with the order ID
-    
-    // First check if there's a purchase order for this material request
-    // For now, navigate with the material request ID and the chat will handle it
-    navigation.navigate('NegotiationChat', {
-      orderId: request.purchaseOrder?._id || request._id,
-      materialRequestId: request._id,
-      userRole: 'vendor'
-    });
+    // Try to find order ID from request object or loaded quotations
+    let orderId = request.purchaseOrder?._id || request.purchaseOrder;
+
+    // If not in request, check associated quotation
+    if (!orderId && quotations[request._id]) {
+      const quotation = quotations[request._id];
+      // Check potential locations for order ID in quotation object
+      orderId = quotation.purchaseOrder || quotation.order;
+    }
+
+    // Handle case where orderId is an object
+    if (orderId && typeof orderId === 'object') {
+      orderId = orderId._id || orderId.id;
+    }
+
+    if (orderId) {
+      console.log('[MaterialRequests] Opening chat for order:', orderId);
+      navigation.navigate('NegotiationChat', {
+        orderId: orderId,
+        userRole: 'vendor'
+      });
+    } else {
+      console.error('[MaterialRequests] Order ID not found for request:', request._id);
+      if (Platform.OS === 'web') {
+        window.alert('Order not found. Please try viewing the order from the Orders tab.');
+      } else {
+        Alert.alert('Error', 'Order details not found. Please view from the Orders tab.');
+      }
+    }
   };
 
   const viewDetails = (request) => {
     console.log('[MaterialRequests] View details for:', request._id);
-    
+
     if (!request.materials || request.materials.length === 0) {
       if (Platform.OS === 'web') {
         window.alert('This material request does not have any materials listed.');
@@ -384,8 +404,8 @@ Delivery: ${quotation.deliveryTerms?.deliveryTime || 'N/A'} days`;
     if (Platform.OS === 'web') {
       setDetailsModal({ visible: true, request });
     } else {
-      const materialsText = request.materials.map((m, i) => 
-        `${i + 1}. ${m.name || 'Unnamed Material'}\n   Qty: ${m.quantity || 0} ${m.unit || 'units'}\n   Est. Cost: ₹${m.estimatedCost || 'N/A'}${m.specifications ? `\n   Specs: ${Object.entries(m.specifications).map(([k,v]) => `${k}: ${v}`).join(', ')}` : ''}`
+      const materialsText = request.materials.map((m, i) =>
+        `${i + 1}. ${m.name || 'Unnamed Material'}\n   Qty: ${m.quantity || 0} ${m.unit || 'units'}\n   Est. Cost: ₹${m.estimatedCost || 'N/A'}${m.specifications ? `\n   Specs: ${Object.entries(m.specifications).map(([k, v]) => `${k}: ${v}`).join(', ')}` : ''}`
       ).join('\n\n');
 
       const message = `Project: ${request.project?.title || 'N/A'}
@@ -403,15 +423,15 @@ Status: ${request.status || 'pending'}`;
       Alert.alert(
         request.title || 'Material Request',
         message,
-        activeTab === 'available' 
+        activeTab === 'available'
           ? [
-              { text: 'Close', style: 'cancel' },
-              { text: 'Accept Request', onPress: () => acceptRequest(request) }
-            ]
+            { text: 'Close', style: 'cancel' },
+            { text: 'Accept Request', onPress: () => acceptRequest(request) }
+          ]
           : [
-              { text: 'Close', style: 'cancel' },
-              { text: 'Create Quotation', onPress: () => createQuotation(request) }
-            ]
+            { text: 'Close', style: 'cancel' },
+            { text: 'View Order', onPress: () => navigation.navigate('Orders', { screen: 'VendorOrders' }) }
+          ]
       );
     }
   };
@@ -433,7 +453,7 @@ Status: ${request.status || 'pending'}`;
   return (
     <View style={styles.container}>
       <AppHeader title="Material Requests" onMenu={() => navigation.openDrawer()} />
-      
+
       {/* Real-time connection indicator - only show when disconnected */}
       {!socketConnected && (
         <View style={styles.connectionBar}>
@@ -441,7 +461,7 @@ Status: ${request.status || 'pending'}`;
           <Text style={styles.connectionText}>Connecting to live updates...</Text>
         </View>
       )}
-      
+
       {/* Details Modal for Web */}
       {Platform.OS === 'web' && detailsModal.visible && detailsModal.request && (
         <Modal
@@ -458,7 +478,7 @@ Status: ${request.status || 'pending'}`;
                   <Feather name="x" size={24} color={theme.colors.text.primary} />
                 </TouchableOpacity>
               </View>
-              
+
               <ScrollView style={styles.modalBody}>
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>Project</Text>
@@ -479,7 +499,7 @@ Status: ${request.status || 'pending'}`;
                       <Text style={styles.materialDetail}>Est. Cost: ₹{m.estimatedCost || 'N/A'}</Text>
                       {m.specifications && (
                         <Text style={styles.materialSpecs}>
-                          Specs: {Object.entries(m.specifications).map(([k,v]) => `${k}: ${v}`).join(', ')}
+                          Specs: {Object.entries(m.specifications).map(([k, v]) => `${k}: ${v}`).join(', ')}
                         </Text>
                       )}
                     </View>
@@ -507,21 +527,21 @@ Status: ${request.status || 'pending'}`;
               </ScrollView>
 
               <View style={styles.modalFooter}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.modalButtonSecondary}
                   onPress={() => setDetailsModal({ visible: false, request: null })}
                 >
                   <Text style={styles.modalButtonSecondaryText}>Close</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.modalButtonPrimary}
                   onPress={() => {
                     setDetailsModal({ visible: false, request: null });
-                    createQuotation(detailsModal.request);
+                    navigation.navigate('Orders', { screen: 'VendorOrders' });
                   }}
                 >
                   <Text style={styles.modalButtonPrimaryText}>
-                    Create Quotation
+                    View Order
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -529,10 +549,10 @@ Status: ${request.status || 'pending'}`;
           </View>
         </Modal>
       )}
-      
+
       {/* Tabs */}
       <View style={styles.tabContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'accepted' && styles.activeTab]}
           onPress={() => setActiveTab('accepted')}
         >
@@ -540,7 +560,7 @@ Status: ${request.status || 'pending'}`;
             Assigned ({myRequests.length})
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'approved' && styles.activeTab]}
           onPress={() => setActiveTab('approved')}
         >
@@ -574,7 +594,7 @@ Status: ${request.status || 'pending'}`;
                     {quotation.items?.length || 0} items
                   </Text>
                 </View>
-                
+
                 <View style={styles.infoRow}>
                   <Feather name="dollar-sign" size={16} color={theme.colors.text.muted} />
                   <Text style={styles.infoText}>
@@ -591,9 +611,9 @@ Status: ${request.status || 'pending'}`;
               </View>
 
               <View style={styles.cardFooter}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.uploadButton}
-                  onPress={() => navigation.navigate('UploadWorkStatus', { 
+                  onPress={() => navigation.navigate('UploadWorkStatus', {
                     quotation: quotation,
                     materialRequest: quotation.materialRequest
                   })}
@@ -616,31 +636,29 @@ Status: ${request.status || 'pending'}`;
               activeTab === 'accepted' &&
               (r.status === 'pending' || r.status === 'approved') &&
               !quotationStatus;
-            
+
             return (
-              <MaterialCard 
-                key={r._id} 
-                item={r} 
+              <MaterialCard
+                key={r._id}
+                item={r}
                 index={requests.indexOf(r)} // Pass index for staggered animation
                 onAccept={
                   canStartOrder
                     ? () => acceptRequest(r)
-                    : isApproved 
-                    ? () => viewQuotationDetails(r, quotation) 
-                    : () => createQuotation(r)
-                } 
-                onDecline={null} 
+                    : isApproved
+                      ? () => viewQuotationDetails(r, quotation)
+                      : () => navigation.navigate('Orders', { screen: 'VendorOrders' })
+                }
+                onDecline={null}
                 onView={() => viewDetails(r)}
                 onChat={quotationStatus && !isApproved ? () => openNegotiationChat(r) : null}
                 showAcceptButton={true}
                 acceptButtonText={
                   canStartOrder
-                    ? 'Accept & Create Order'
-                    : isApproved 
-                    ? 'View Quote' 
-                    : quotationStatus 
-                    ? 'Update Quote' 
-                    : 'Create Quotation'
+                    ? 'Accept Request'
+                    : isApproved
+                      ? 'View Quote'
+                      : 'View Order'
                 }
                 quotationStatus={quotationStatus}
               />
@@ -652,11 +670,11 @@ Status: ${request.status || 'pending'}`;
             <Feather name="inbox" size={64} color={theme.colors.text.muted} />
             <Text style={styles.emptyText}>
               {errorMessage ? `${errorMessage}\n\n` : ''}
-              {activeTab === 'available' 
+              {activeTab === 'available'
                 ? 'No available material requests'
                 : activeTab === 'approved'
-                ? 'No approved quotations\n\nOnce your quotations are approved, they will appear here'
-                : 'No accepted material requests\n\nAccept requests from the Available tab to create quotations'
+                  ? 'No approved quotations\n\nOnce your quotations are approved, they will appear here'
+                  : 'No accepted material requests\n\nAccept requests from the Available tab to create quotations'
               }
             </Text>
           </View>

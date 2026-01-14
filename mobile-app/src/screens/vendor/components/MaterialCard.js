@@ -3,19 +3,19 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native
 import { Feather } from '@expo/vector-icons';
 import theme from '../../../styles/theme';
 
-export default function MaterialCard({ 
-  item, 
-  onAccept, 
-  onDecline, 
-  onView, 
+export default function MaterialCard({
+  item,
+  onAccept,
+  onDecline,
+  onView,
   onChat,
-  showAcceptButton = true, 
+  showAcceptButton = true,
   acceptButtonText = 'Accept',
   quotationStatus = null,
   index = 0
 }) {
   console.log('[MaterialCard] Rendering with quotationStatus:', quotationStatus);
-  
+
   // Animation reference
   const slideAnim = useRef(new Animated.Value(50)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -46,10 +46,10 @@ export default function MaterialCard({
   const deadline = item.requiredBy ? new Date(item.requiredBy).toLocaleDateString() : 'No deadline';
   const status = item.status || 'pending';
   const priority = item.priority || 'medium';
-  
+
   // Priority color mapping
   const getPriorityColor = () => {
-    switch(priority) {
+    switch (priority) {
       case 'urgent': return '#EF4444';
       case 'high': return '#F59E0B';
       case 'medium': return '#3B82F6';
@@ -60,7 +60,7 @@ export default function MaterialCard({
 
   // Status color mapping
   const getStatusColor = () => {
-    switch(status) {
+    switch (status) {
       case 'pending': return '#F59E0B';
       case 'approved': return '#10B981';
       case 'rejected': return '#EF4444';
@@ -69,7 +69,7 @@ export default function MaterialCard({
   };
 
   return (
-    <Animated.View 
+    <Animated.View
       style={[
         styles.card,
         {
@@ -121,8 +121,8 @@ export default function MaterialCard({
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity 
-          style={styles.viewButton} 
+        <TouchableOpacity
+          style={styles.viewButton}
           onPress={() => {
             console.log('[MaterialCard] View button clicked');
             onView();
@@ -132,10 +132,10 @@ export default function MaterialCard({
           <Feather name="eye" size={16} color={theme.colors.primary} />
           <Text style={styles.viewText}>View</Text>
         </TouchableOpacity>
-        
+
         {quotationStatus && onChat && (
-          <TouchableOpacity 
-            style={styles.chatButton} 
+          <TouchableOpacity
+            style={styles.chatButton}
             onPress={() => {
               console.log('[MaterialCard] Chat button clicked');
               onChat();
@@ -146,17 +146,17 @@ export default function MaterialCard({
             <Text style={styles.chatText}>Chat</Text>
           </TouchableOpacity>
         )}
-        
-        <TouchableOpacity 
-          style={[styles.acceptButton, quotationStatus && styles.updateButton]} 
+
+        <TouchableOpacity
+          style={[styles.acceptButton, quotationStatus && styles.updateButton]}
           onPress={() => {
             console.log('[MaterialCard] Action button clicked:', acceptButtonText);
             if (onAccept) onAccept();
           }}
           activeOpacity={0.7}
         >
-          <Text style={styles.acceptText}>{quotationStatus ? 'Update' : acceptButtonText}</Text>
-          <Feather name={quotationStatus ? 'edit-2' : 'arrow-right'} size={16} color="#fff" />
+          <Text style={styles.acceptText}>{acceptButtonText}</Text>
+          <Feather name="arrow-right" size={16} color="#fff" />
         </TouchableOpacity>
       </View>
     </Animated.View>

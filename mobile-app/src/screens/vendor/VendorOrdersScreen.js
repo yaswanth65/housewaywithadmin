@@ -35,10 +35,10 @@ const VendorOrdersScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
-  
+
   // Get vendor ID from auth context
   const currentVendorId = user?._id;
-  
+
   // Filter options - removed 'partially_delivered' as it's handled in Delivery screen
   const filters = [
     { id: 'all', label: 'All Orders', icon: 'list' },
@@ -47,7 +47,7 @@ const VendorOrdersScreen = ({ navigation }) => {
     { id: 'accepted', label: 'Accepted', icon: 'check-circle' },
     { id: 'completed', label: 'Completed', icon: 'verified' },
   ];
-  
+
   // Load viewed orders from storage
   const loadViewedOrders = useCallback(async () => {
     try {
@@ -59,7 +59,7 @@ const VendorOrdersScreen = ({ navigation }) => {
       console.error('Error loading viewed orders:', error);
     }
   }, []);
-  
+
   // Mark order as viewed
   const markOrderAsViewed = useCallback(async (orderId) => {
     try {
@@ -71,19 +71,19 @@ const VendorOrdersScreen = ({ navigation }) => {
       console.error('Error saving viewed order:', error);
     }
   }, [viewedOrders]);
-  
+
   // Load orders
   const loadOrders = useCallback(async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
-    
+
     try {
       // Backend will filter orders based on authenticated user's role
       const response = await purchaseOrdersAPI.getMyOrders();
-      
+
       if (response.success && response.data) {
         // Handle both response formats: array or object with purchaseOrders property
-        const ordersData = Array.isArray(response.data) 
-          ? response.data 
+        const ordersData = Array.isArray(response.data)
+          ? response.data
           : (response.data.purchaseOrders || []);
         // Filter out draft orders on client side
         const nonDraftOrders = ordersData.filter(o => o.status !== 'draft');
@@ -100,41 +100,41 @@ const VendorOrdersScreen = ({ navigation }) => {
       setIsRefreshing(false);
     }
   }, [activeFilter]);
-  
+
   // Initial load
   useEffect(() => {
     loadViewedOrders();
     loadOrders();
-    
+
     // Setup socket listener for real-time order updates
     // Join vendor-specific room for real-time updates
     if (currentVendorId) {
       socket.emit('joinRoom', `vendor_${currentVendorId}`);
       console.log('[VendorOrders] Joined room:', `vendor_${currentVendorId}`);
     }
-    
+
     // Listen for order updates from other users (when admin accepts, etc.)
     const handleOrderUpdated = (data) => {
       console.log('[VendorOrders] Order updated:', data);
       // Refresh orders when an order is updated
       loadOrders(false);
     };
-    
+
     const handleQuotationAccepted = (data) => {
       console.log('[VendorOrders] Quotation accepted:', data);
       // Refresh orders when quotation is accepted
       loadOrders(false);
     };
-    
+
     socket.on('orderUpdated', handleOrderUpdated);
     socket.on('quotationAccepted', handleQuotationAccepted);
-    
+
     return () => {
       socket.off('orderUpdated', handleOrderUpdated);
       socket.off('quotationAccepted', handleQuotationAccepted);
     };
   }, [currentVendorId, loadOrders]);
-  
+
   // Reload when screen is focused (to update viewed status)
   useFocusEffect(
     useCallback(() => {
@@ -143,23 +143,28 @@ const VendorOrdersScreen = ({ navigation }) => {
       loadOrders(false);
     }, [loadOrders])
   );
-  
+
   // Apply filter
   const applyFilter = (filter, data = orders) => {
     setActiveFilter(filter);
     if (filter === 'all') {
       setFilteredOrders(data);
+    } else if (filter === 'accepted') {
+      // Group all active/delivery statuses under 'accepted'
+      setFilteredOrders(data.filter(order =>
+        ['accepted', 'in_progress', 'acknowledged', 'partially_delivered'].includes(order.status)
+      ));
     } else {
       setFilteredOrders(data.filter(order => order.status === filter));
     }
   };
-  
+
   // Refresh handler
   const handleRefresh = () => {
     setIsRefreshing(true);
     loadOrders(false);
   };
-  
+
   // Navigate to chat and mark as viewed
   const handleOrderPress = (order) => {
     markOrderAsViewed(order._id);
@@ -168,12 +173,12 @@ const VendorOrdersScreen = ({ navigation }) => {
       userRole: 'vendor',
     });
   };
-  
+
   // Check if order is new (status 'sent' and not yet viewed)
   const isOrderNew = (order) => {
     return order.status === 'sent' && !viewedOrders.has(order._id);
   };
-  
+
   // Get status configuration
   const getStatusConfig = (status) => {
     const configs = {
@@ -189,14 +194,14 @@ const VendorOrdersScreen = ({ navigation }) => {
     };
     return configs[status] || { color: '#FFFFFF', bgColor: '#6B7280', label: status, icon: 'help' };
   };
-  
+
   // Format date
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
     const diff = now - date;
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
+
     if (days === 0) {
       return 'Today';
     } else if (days === 1) {
@@ -210,12 +215,12 @@ const VendorOrdersScreen = ({ navigation }) => {
       });
     }
   };
-  
+
   // Render order card
   const renderOrderCard = ({ item: order }) => {
     const statusConfig = getStatusConfig(order.status);
     const isNew = isOrderNew(order);
-    
+
     return (
       <TouchableOpacity
         style={[styles.orderCard, isNew && styles.orderCardNew]}
@@ -228,7 +233,7 @@ const VendorOrdersScreen = ({ navigation }) => {
             <Text style={styles.newBadgeText}>NEW</Text>
           </View>
         )}
-        
+
         {/* Header */}
         <View style={styles.cardHeader}>
           <View style={styles.orderNumberContainer}>
@@ -242,18 +247,18 @@ const VendorOrdersScreen = ({ navigation }) => {
           </View>
           <Text style={styles.orderDate}>{formatDate(order.sentAt || order.createdAt)}</Text>
         </View>
-        
+
         {/* Title */}
         <Text style={styles.orderTitle} numberOfLines={2}>
           {order.title}
         </Text>
-        
+
         {/* Project */}
         <View style={styles.projectRow}>
           <MaterialIcons name="business" size={14} color="#6B7280" />
           <Text style={styles.projectName}>{order.project?.title || 'Unknown Project'}</Text>
         </View>
-        
+
         {/* Materials List */}
         {order.items && order.items.length > 0 && (
           <View style={styles.materialsContainer}>
@@ -271,7 +276,7 @@ const VendorOrdersScreen = ({ navigation }) => {
             )}
           </View>
         )}
-        
+
         {/* Items Summary */}
         <View style={styles.itemsSummary}>
           <MaterialCommunityIcons name="package-variant" size={14} color="#6B7280" />
@@ -284,7 +289,7 @@ const VendorOrdersScreen = ({ navigation }) => {
             </Text>
           )}
         </View>
-        
+
         {/* Final Amount (if accepted) */}
         {order.finalAmount && (
           <View style={styles.finalAmountRow}>
@@ -295,11 +300,11 @@ const VendorOrdersScreen = ({ navigation }) => {
             </Text>
           </View>
         )}
-        
+
         {/* Action hint */}
         <View style={styles.actionHint}>
           <Text style={styles.actionHintText}>
-            {order.status === 'sent' 
+            {order.status === 'sent'
               ? 'Tap to submit quotation'
               : order.status === 'in_negotiation'
                 ? 'Tap to continue negotiation'
@@ -310,7 +315,7 @@ const VendorOrdersScreen = ({ navigation }) => {
           </Text>
           <MaterialIcons name="chevron-right" size={20} color="#9CA3AF" />
         </View>
-        
+
         {/* Delivery prompt for accepted orders */}
         {order.status === 'accepted' && (
           <View style={styles.deliveryPrompt}>
@@ -323,7 +328,7 @@ const VendorOrdersScreen = ({ navigation }) => {
       </TouchableOpacity>
     );
   };
-  
+
   // Loading state
   if (isLoading) {
     return (
@@ -335,7 +340,7 @@ const VendorOrdersScreen = ({ navigation }) => {
       </SafeAreaView>
     );
   }
-  
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -363,7 +368,7 @@ const VendorOrdersScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </View>
-      
+
       {/* Filters */}
       <View style={styles.filtersContainer}>
         <FlatList
@@ -374,19 +379,19 @@ const VendorOrdersScreen = ({ navigation }) => {
           contentContainerStyle={styles.filtersList}
           renderItem={({ item }) => {
             const isActive = activeFilter === item.id;
-            const count = item.id === 'all' 
-              ? orders.length 
+            const count = item.id === 'all'
+              ? orders.length
               : orders.filter(o => o.status === item.id).length;
-            
+
             return (
               <TouchableOpacity
                 style={[styles.filterChip, isActive && styles.filterChipActive]}
                 onPress={() => applyFilter(item.id)}
               >
-                <MaterialIcons 
-                  name={item.icon} 
-                  size={16} 
-                  color={isActive ? '#FFFFFF' : '#6B7280'} 
+                <MaterialIcons
+                  name={item.icon}
+                  size={16}
+                  color={isActive ? '#FFFFFF' : '#6B7280'}
                 />
                 <Text style={[
                   styles.filterChipText,
@@ -412,7 +417,7 @@ const VendorOrdersScreen = ({ navigation }) => {
           }}
         />
       </View>
-      
+
       {/* Orders List */}
       <FlatList
         style={styles.ordersList}
@@ -429,14 +434,14 @@ const VendorOrdersScreen = ({ navigation }) => {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons 
-              name="clipboard-text-outline" 
-              size={70} 
-              color="#D1D5DB" 
+            <MaterialCommunityIcons
+              name="clipboard-text-outline"
+              size={70}
+              color="#D1D5DB"
             />
             <Text style={styles.emptyTitle}>No orders found</Text>
             <Text style={styles.emptySubtitle}>
-              {activeFilter === 'all' 
+              {activeFilter === 'all'
                 ? 'You have no orders assigned yet'
                 : `No orders with "${filters.find(f => f.id === activeFilter)?.label}" status`
               }

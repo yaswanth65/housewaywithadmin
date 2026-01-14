@@ -221,6 +221,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Update user data locally without making API call (for cases where API already updated)
+  const updateUserLocally = async (userData) => {
+    try {
+      // Merge with existing user data to preserve all fields
+      const mergedUser = { ...state.user, ...userData };
+      await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(mergedUser));
+      dispatch({
+        type: AUTH_ACTIONS.UPDATE_USER,
+        payload: mergedUser,
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[AuthContext] Local update error:', error);
+      return { success: false, message: 'Failed to update local data' };
+    }
+  };
+
   const clearError = () => dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
 
   const value = {
@@ -233,6 +250,7 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateUser,
+    updateUserLocally,
     clearError,
   };
 
